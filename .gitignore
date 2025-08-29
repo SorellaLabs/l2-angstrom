@@ -1,0 +1,13 @@
+/out
+/cache
+/broadcast
+/target
+/lcov.info
+!requirements.txt
+.DS_Store
+.env
+.luasnip
+.venv
+/proofs
+/kompiled
+digest
