@@ -8,6 +8,7 @@ ast = true
 evm_version = "cancun"
 libs = ["lib"]
 dynamic_test_linking = true
+show_progress = true
 
 ignored_error_codes = [
   2394, # Transient storage warning
@@ -40,25 +41,3 @@ line_length = 100
 fail_on_revert = true
 depth = 200
 runs = 256
-
-[profile.ci]
-show_progress = false
-
-[profile.ci.invariant]
-fail_on_revert = true
-depth = 50
-runs = 50
-
-[profile.light-fuzz.invariant]
-runs = 40
-depth = 100
-
-[profile.heavy-fuzz.invariant]
-runs = 200
-
-[profile.loaders]
-show_progress = false
-optimizer = true
-ast = true
-src = "../crates/uniswap-v4/src/uniswap/loaders"
-libs = ["lib"]
