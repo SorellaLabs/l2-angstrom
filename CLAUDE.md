@@ -15,20 +15,14 @@ Angstrom L2 is a Uniswap V4 hook-based MEV protection system for rollups with pr
 
 ## Key Commands
 
-### Build & Test
-
 ```bash
-# Verify everything compiles
-forge build
+forge test          # Run all tests (Must be run and fully pass to claim a feature is complete)
+forge test -vvv     # Verbose output & traces for debugging when tests fail
+forge test --match-test <name>  # During development: Run specific tests to speedup iteration
+forge test --match-contract <name> # During development: Run specific set of tests to speedup iteration
 
-# Test (FFI required for Python scripts)
-forge test # Run all tests
-forge test -vvv # Verbose output
-forge test --match-test <name>  # Run specific test
-forge test --match-contract <name> # Run specific set of tests
-
-# Format
-forge fmt                              # Format Solidity code
+forge fmt                           # Regularly format to make sure code is clean
+forge lint                          # Run regularly to ensure stuff is clean
 ```
 
 ## Angstrom L2 Implementation

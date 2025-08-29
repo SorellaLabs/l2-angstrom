@@ -6,8 +6,6 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {TickLib} from "./TickLib.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 
-/// @title TickIteratorUp
-/// @notice Iterator for traversing initialized ticks from low to high
 struct TickIteratorUp {
     IPoolManager manager;
     PoolId poolId;
@@ -19,8 +17,6 @@ struct TickIteratorUp {
     bool wordInitialized;
 }
 
-/// @title TickIteratorDown
-/// @notice Iterator for traversing initialized ticks from high to low
 struct TickIteratorDown {
     IPoolManager manager;
     PoolId poolId;
@@ -35,8 +31,6 @@ struct TickIteratorDown {
 using TickIteratorLib for TickIteratorDown global;
 using TickIteratorLib for TickIteratorUp global;
 
-/// @title TickIterator
-/// @notice Library for iterating through initialized ticks in a Uniswap V4 pool
 /// @author philogy <https://github.com/philogy>
 library TickIteratorLib {
     using TickLib for int24;
@@ -70,16 +64,13 @@ library TickIteratorLib {
             return iter;
         }
 
-        // Normalize and compress the start tick
         int24 compressed = startTick.compress(tickSpacing);
         (iter.currentWordPos,) = TickLib.position(compressed);
         iter.currentTick = compressed * tickSpacing;
 
-        // Load the first word using IUniV4
         iter.currentWord = manager.getPoolBitmapInfo(poolId, iter.currentWordPos);
         iter.wordInitialized = true;
 
-        // Find first initialized tick >= startTick
         _advanceToNextUp(iter);
     }
 
@@ -95,47 +86,34 @@ library TickIteratorLib {
     /// @return tick The next initialized tick
     function getNext(TickIteratorUp memory self) internal view returns (int24 tick) {
         require(hasNext(self), "No more ticks");
-
         tick = self.currentTick;
-
-        // Move to next tick
         _moveToNextUp(self);
     }
 
-    /// @dev Move iterator to the next initialized tick
     function _moveToNextUp(TickIteratorUp memory self) private view {
-        // Increment to next potential tick
         self.currentTick += self.tickSpacing;
-
-        // Advance to next initialized tick
         _advanceToNextUp(self);
     }
 
-    /// @dev Advance iterator to the next initialized tick from current position
     function _advanceToNextUp(TickIteratorUp memory self) private view {
         while (self.currentTick <= self.endTick) {
             int24 compressed = self.currentTick.compress(self.tickSpacing);
             (int16 wordPos, uint8 bitPos) = TickLib.position(compressed);
 
-            // Check if we need to load a new word
             if (wordPos != self.currentWordPos) {
                 self.currentWordPos = wordPos;
                 self.currentWord = self.manager.getPoolBitmapInfo(self.poolId, wordPos);
             }
 
-            // Check if current tick is initialized
             if (self.currentWord.isInitialized(bitPos)) {
-                return; // Found initialized tick
+                return;
             }
 
-            // Try to find next initialized tick in current word
             (bool found, uint8 nextBitPos) = self.currentWord.nextBitPosGte(bitPos + 1);
 
             if (found) {
-                // Found in current word
                 self.currentTick = TickLib.toTick(wordPos, nextBitPos, self.tickSpacing);
             } else {
-                // Move to next word
                 self.currentTick = TickLib.toTick(wordPos + 1, 0, self.tickSpacing);
             }
         }
@@ -171,16 +149,13 @@ library TickIteratorLib {
             return iter;
         }
 
-        // Normalize and compress the start tick
         int24 compressed = startTick.compress(tickSpacing);
         (iter.currentWordPos,) = TickLib.position(compressed);
         iter.currentTick = compressed * tickSpacing;
 
-        // Load the first word using IUniV4
         iter.currentWord = manager.getPoolBitmapInfo(poolId, iter.currentWordPos);
         iter.wordInitialized = true;
 
-        // Find first initialized tick <= startTick
         _advanceToNextDown(iter);
     }
 
@@ -203,45 +178,34 @@ library TickIteratorLib {
         _moveToNextDown(self);
     }
 
-    /// @dev Move iterator to the next initialized tick
     function _moveToNextDown(TickIteratorDown memory self) private view {
-        // Decrement to next potential tick
         self.currentTick -= self.tickSpacing;
-
-        // Advance to next initialized tick
         _advanceToNextDown(self);
     }
 
-    /// @dev Advance iterator to the next initialized tick from current position
     function _advanceToNextDown(TickIteratorDown memory self) private view {
         while (self.currentTick >= self.endTick) {
             int24 compressed = self.currentTick.compress(self.tickSpacing);
             (int16 wordPos, uint8 bitPos) = TickLib.position(compressed);
 
-            // Check if we need to load a new word
             if (wordPos != self.currentWordPos) {
                 self.currentWordPos = wordPos;
                 self.currentWord = self.manager.getPoolBitmapInfo(self.poolId, wordPos);
             }
 
-            // Check if current tick is initialized
             if (self.currentWord.isInitialized(bitPos)) {
-                return; // Found initialized tick
+                return;
             }
 
-            // Try to find next initialized tick in current word (going backwards)
             if (bitPos > 0) {
                 (bool found, uint8 nextBitPos) = self.currentWord.nextBitPosLte(bitPos - 1);
 
                 if (found) {
-                    // Found in current word
                     self.currentTick = TickLib.toTick(wordPos, nextBitPos, self.tickSpacing);
                 } else {
-                    // Move to previous word, last bit position
                     self.currentTick = TickLib.toTick(wordPos - 1, 255, self.tickSpacing);
                 }
             } else {
-                // Already at bit 0, move to previous word
                 self.currentTick = TickLib.toTick(wordPos - 1, 255, self.tickSpacing);
             }
         }

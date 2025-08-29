@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {BaseTest} from "test/_helpers/BaseTest.sol";
 import {Script} from "forge-std/Script.sol";
 
-abstract contract BaseScript is BaseTest {
+abstract contract BaseScript is BaseTest, Script {
     IVanityMarket constant VANITY_MARKET = IVanityMarket(0x000000000000b361194cfe6312EE3210d53C15AA);
 }
 

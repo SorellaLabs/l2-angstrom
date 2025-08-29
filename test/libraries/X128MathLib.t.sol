@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import {BaseTest} from "test/_helpers/BaseTest.sol";
 import {X128MathLib} from "src/libraries/X128MathLib.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
-import {PRNG} from "super-sol/collections/PRNG.sol";
-import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract X128MathLibTest is BaseTest {
