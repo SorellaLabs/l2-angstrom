@@ -77,7 +77,7 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 3. Define any external interface necessary to be able to compile the tests
 4. Run the new tests, they should fail
 5. Implement the actual feature, progressively run the tests to ensure they pass & everything compiles
-6. Task is complete once the feature has sufficient tests, is implemented and all tests pass
+6. Task is complete once the feature is implemented, has sufficient tests and *all* of the codebase's tests pass including the new ones
 
 ## Design Principles
 

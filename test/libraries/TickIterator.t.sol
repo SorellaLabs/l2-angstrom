@@ -195,17 +195,12 @@ contract TickIteratorTest is BaseTest {
 
         // Verify we have the expected ticks
         // At minimum, ticks 40 and 60 should be initialized (position boundaries)
-        assertTrue(count >= 2, "Should have at least 2 initialized ticks");
+        assertEq(count, 2, "Should have at least 2 initialized ticks");
         assertEq(initializedTicks[0], 40, "First tick should be 40");
-        assertEq(initializedTicks[count - 1], 60, "Last tick should be 60");
-
-        // If there's a tick in between (likely tick 50), that's also valid
-        if (count == 3) {
-            assertEq(initializedTicks[1], 50, "Middle tick should be 50 if present");
-        }
+        assertEq(initializedTicks[1], 60, "Last tick should be 60");
     }
 
-    function test_iterateUp_maxTick() public {
+    function test_iterateUp_maxTick() public view {
         // Test near maximum tick (must be aligned to tick spacing)
         int24 maxAlignedTick = (TickMath.MAX_TICK / TICK_SPACING) * TICK_SPACING;
         int24 nearMaxTick = maxAlignedTick - TICK_SPACING;
@@ -333,7 +328,7 @@ contract TickIteratorTest is BaseTest {
         assertFalse(iter.hasNext());
     }
 
-    function test_iterateDown_minTick() public {
+    function test_iterateDown_minTick() public view {
         // Test near minimum tick (must be aligned to tick spacing)
         int24 minAlignedTick = (TickMath.MIN_TICK / TICK_SPACING) * TICK_SPACING;
         int24 nearMinTick = minAlignedTick + TICK_SPACING;

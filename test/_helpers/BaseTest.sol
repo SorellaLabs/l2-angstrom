@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {Test} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/console2.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {stdError} from "forge-std/StdError.sol";
-import {TickLib} from "src/libraries/TickLib.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {hasAngstromHookFlags, ANGSTROM_INIT_HOOK_FEE} from "src/modules/UniConsumer.sol";
 
