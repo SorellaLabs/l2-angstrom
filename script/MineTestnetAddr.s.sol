@@ -3,10 +3,11 @@ pragma solidity ^0.8.0;
 
 import {BaseScript} from "./BaseScript.sol";
 import {console} from "forge-std/console.sol";
-import {hasAngstromHookFlags} from "src/modules/UniConsumer.sol";
+import {getRequiredHookPermissions} from "src/AngstromL2.sol";
+import {HookDeployer} from "../test/_helpers/HookDeployer.sol";
 
 /// @author philogy <https://github.com/philogy>
-contract MineTestnetAddrScript is BaseScript {
+contract MineTestnetAddrScript is BaseScript, HookDeployer {
     function run() public {
         uint256 pk = vm.envUint("TESTNET_PK");
         address owner = vm.addr(pk);
@@ -28,7 +29,13 @@ contract MineTestnetAddrScript is BaseScript {
     }
 
     function _foundAddr(uint256 id, uint8 nonce) internal view returns (bool) {
-        if (!hasAngstromHookFlags(VANITY_MARKET.computeAddress(bytes32(id), nonce))) return false;
+        if (
+            !(
+                validateHookPermissions(
+                    VANITY_MARKET.computeAddress(bytes32(id), nonce), getRequiredHookPermissions()
+                )
+            )
+        ) return false;
         try VANITY_MARKET.addressOf(id) returns (address) {
             return false;
         } catch (bytes memory errData) {

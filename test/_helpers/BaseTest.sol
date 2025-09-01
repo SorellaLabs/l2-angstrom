@@ -9,7 +9,9 @@ import {Test} from "forge-std/Test.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {stdError} from "forge-std/StdError.sol";
 import {HookDeployer} from "./HookDeployer.sol";
-import {hasAngstromHookFlags, ANGSTROM_INIT_HOOK_FEE} from "src/modules/UniConsumer.sol";
+import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
+import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "src/hook-config.sol";
+import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 
@@ -31,39 +33,31 @@ contract BaseTest is Test, HookDeployer {
         return IPoolManager(addr);
     }
 
-    function deployAngstrom(bytes memory initcode, IPoolManager uni, address controller)
-        internal
-        returns (address addr)
-    {
+    function deployAngstromL2(
+        bytes memory initcode,
+        IPoolManager uni,
+        address owner,
+        Hooks.Permissions memory requiredPermissions
+    ) internal returns (address addr) {
         bool success;
         (success, addr,) = deployHook(
-            bytes.concat(initcode, abi.encode(uni, controller)),
-            CREATE2_FACTORY,
-            hasAngstromHookFlags
+            bytes.concat(initcode, abi.encode(uni, owner)), CREATE2_FACTORY, requiredPermissions
         );
         assertTrue(success);
     }
 
-    function poolKey(address hook, address asset0, address asset1, int24 tickSpacing)
+    function poolKey(address hook, address token, int24 tickSpacing)
         internal
         pure
         returns (PoolKey memory pk)
     {
         pk.hooks = IHooks(hook);
-        pk.currency0 = Currency.wrap(asset0);
-        pk.currency1 = Currency.wrap(asset1);
+        pk.currency0 = Currency.wrap(address(0));
+        pk.currency1 = Currency.wrap(token);
         pk.tickSpacing = tickSpacing;
-        pk.fee = address(hook) == address(0) ? 0 : ANGSTROM_INIT_HOOK_FEE;
-    }
-
-    function poolKey(address asset0, address asset1, int24 tickSpacing)
-        internal
-        pure
-        returns (PoolKey memory pk)
-    {
-        pk.currency0 = Currency.wrap(asset0);
-        pk.currency1 = Currency.wrap(asset1);
-        pk.tickSpacing = tickSpacing;
+        pk.fee = address(hook) != address(0) && POOLS_MUST_HAVE_DYNAMIC_FEE
+            ? LPFeeLibrary.DYNAMIC_FEE_FLAG
+            : 0;
     }
 
     function computeDomainSeparator(address angstrom) internal view returns (bytes32) {
@@ -232,6 +226,10 @@ contract BaseTest is Test, HookDeployer {
             bytes.concat(bytes32(uint256(0x20)), bytes32(encoded.length / 0x20), encoded),
             (address[])
         );
+    }
+
+    function setPriorityFee(uint256 fee) internal view {
+        vm.txGasPrice(block.basefee + fee);
     }
 
     function min(uint256 x, uint256 y) internal pure returns (uint256) {

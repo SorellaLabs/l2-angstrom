@@ -88,58 +88,55 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(50, 100);
         addLiquidityAtTicks(100, 150);
 
+        // With exclusive bounds, (-100, 100) excludes both -100 and 100
+        // Should get: -50, 0, 50
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
 
-        // Should iterate through initialized ticks
+        // Should iterate through initialized ticks (excluding boundaries)
         assertTrue(iter.hasNext(), "Should have first tick");
-        assertEq(iter.getNext(), -100, "First tick should be -100");
+        assertEq(iter.getNext(), -50, "First tick should be -50");
 
         assertTrue(iter.hasNext(), "Should have second tick");
-        assertEq(iter.getNext(), -50, "Second tick should be -50");
+        assertEq(iter.getNext(), 0, "Second tick should be 0");
 
         assertTrue(iter.hasNext(), "Should have third tick");
-        assertEq(iter.getNext(), 0, "Third tick should be 0");
-
-        assertTrue(iter.hasNext(), "Should have fourth tick");
-        assertEq(iter.getNext(), 50, "Fourth tick should be 50");
-
-        assertTrue(iter.hasNext(), "Should have fifth tick");
-        assertEq(iter.getNext(), 100, "Fifth tick should be 100");
+        assertEq(iter.getNext(), 50, "Third tick should be 50");
 
         assertFalse(iter.hasNext(), "Should have no more ticks");
     }
 
-    function test_iterateUp_inclusiveBoundaries() public {
-        // Test that boundaries are inclusive
+    function test_iterateUp_exclusiveBoundaries() public {
+        // Test that boundaries are exclusive
         addLiquidityAtTicks(-200, -100);
         addLiquidityAtTicks(-100, 0);
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
+        // With exclusive bounds, -100 to 100 means (-100, 100)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
 
         assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), -100, "Should include start boundary");
+        assertEq(iter.getNext(), 0, "Should exclude start boundary -100");
 
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 0);
-
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 100, "Should include end boundary");
-
-        assertFalse(iter.hasNext(), "Should not go beyond end boundary");
+        assertFalse(iter.hasNext(), "Should exclude end boundary 100");
     }
 
     function test_iterateUp_acrossWords() public {
         // Test iteration across word boundaries (256 ticks per word when compressed)
         // Word boundary is at compressed tick 256, which is tick 2560 with spacing 10
+        addLiquidityAtTicks(-2570, -2560);
         addLiquidityAtTicks(-2560, -2550);
         addLiquidityAtTicks(-10, 0);
         addLiquidityAtTicks(0, 10);
         addLiquidityAtTicks(2550, 2560);
         addLiquidityAtTicks(2560, 2570);
+        addLiquidityAtTicks(2570, 2580);
 
+        // Exclusive bounds: (-3000, 3000)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -3000, 3000);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), -2570);
 
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), -2560);
@@ -165,6 +162,9 @@ contract TickIteratorTest is BaseTest {
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), 2570);
 
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 2580);
+
         assertFalse(iter.hasNext());
     }
 
@@ -178,26 +178,24 @@ contract TickIteratorTest is BaseTest {
     function test_iterateUp_singleTick() public {
         addLiquidityAtTicks(40, 60);
 
-        // Test iteration over position boundaries
+        // Test iteration over position boundaries with exclusive bounds
         // When adding liquidity from 40 to 60, ticks 40 and 60 are initialized
-        // Note: If current pool tick is 0 and within range, tick 50 might also be initialized
-
-        // Check what ticks are actually initialized in the full range
+        // With exclusive bounds (40, 60), neither boundary should be included
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 40, 60);
 
-        // Collect all initialized ticks
-        int24[] memory initializedTicks = new int24[](10);
-        uint256 count = 0;
-        while (iter.hasNext() && count < 10) {
-            initializedTicks[count] = iter.getNext();
-            count++;
-        }
+        // Should have no ticks as both boundaries are excluded
+        assertFalse(iter.hasNext(), "Should have no ticks with exclusive boundaries");
 
-        // Verify we have the expected ticks
-        // At minimum, ticks 40 and 60 should be initialized (position boundaries)
-        assertEq(count, 2, "Should have at least 2 initialized ticks");
-        assertEq(initializedTicks[0], 40, "First tick should be 40");
-        assertEq(initializedTicks[1], 60, "Last tick should be 60");
+        // To get the boundary ticks, need to expand range
+        TickIteratorUp memory iter2 = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 30, 70);
+
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 40, "First tick should be 40");
+
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 60, "Second tick should be 60");
+
+        assertFalse(iter2.hasNext());
     }
 
     function test_iterateUp_maxTick() public view {
@@ -223,60 +221,56 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(50, 100);
         addLiquidityAtTicks(100, 150);
 
+        // With exclusive bounds (100, -100) means we exclude both 100 and -100
         TickIteratorDown memory iter =
             TickIteratorLib.initDown(manager, pid, TICK_SPACING, 100, -100);
 
-        // Should iterate through ticks in reverse
+        // Should iterate through ticks in reverse (excluding boundaries)
         assertTrue(iter.hasNext(), "Should have first tick");
-        assertEq(iter.getNext(), 100, "First tick should be 100");
+        assertEq(iter.getNext(), 50, "First tick should be 50");
 
         assertTrue(iter.hasNext(), "Should have second tick");
-        assertEq(iter.getNext(), 50, "Second tick should be 50");
+        assertEq(iter.getNext(), 0, "Second tick should be 0");
 
         assertTrue(iter.hasNext(), "Should have third tick");
-        assertEq(iter.getNext(), 0, "Third tick should be 0");
-
-        assertTrue(iter.hasNext(), "Should have fourth tick");
-        assertEq(iter.getNext(), -50, "Fourth tick should be -50");
-
-        assertTrue(iter.hasNext(), "Should have fifth tick");
-        assertEq(iter.getNext(), -100, "Fifth tick should be -100");
+        assertEq(iter.getNext(), -50, "Third tick should be -50");
 
         assertFalse(iter.hasNext(), "Should have no more ticks");
     }
 
-    function test_iterateDown_inclusiveBoundaries() public {
-        // Test that boundaries are inclusive
+    function test_iterateDown_exclusiveBoundaries() public {
+        // Test that boundaries are exclusive
         addLiquidityAtTicks(-200, -100);
         addLiquidityAtTicks(-100, 0);
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
+        // With exclusive bounds (100, -100)
         TickIteratorDown memory iter =
             TickIteratorLib.initDown(manager, pid, TICK_SPACING, 100, -100);
 
         assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 100, "Should include start boundary");
+        assertEq(iter.getNext(), 0, "Should exclude start boundary 100");
 
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 0);
-
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), -100, "Should include end boundary");
-
-        assertFalse(iter.hasNext(), "Should not go beyond end boundary");
+        assertFalse(iter.hasNext(), "Should exclude end boundary -100");
     }
 
     function test_iterateDown_acrossWords() public {
         // Test iteration across word boundaries
+        addLiquidityAtTicks(-2570, -2560);
         addLiquidityAtTicks(-2560, -2550);
         addLiquidityAtTicks(-10, 0);
         addLiquidityAtTicks(0, 10);
         addLiquidityAtTicks(2550, 2560);
         addLiquidityAtTicks(2560, 2570);
+        addLiquidityAtTicks(2570, 2580);
 
+        // Exclusive bounds (3000, -3000)
         TickIteratorDown memory iter =
             TickIteratorLib.initDown(manager, pid, TICK_SPACING, 3000, -3000);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 2580);
 
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), 2570);
@@ -302,6 +296,9 @@ contract TickIteratorTest is BaseTest {
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), -2560);
 
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), -2570);
+
         assertFalse(iter.hasNext());
     }
 
@@ -316,16 +313,21 @@ contract TickIteratorTest is BaseTest {
     function test_iterateDown_singleTick() public {
         addLiquidityAtTicks(40, 60);
 
-        // Iterate over range that includes boundaries
+        // With exclusive bounds (60, 40), both boundaries are excluded
         TickIteratorDown memory iter = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 60, 40);
 
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 60);
+        assertFalse(iter.hasNext(), "Should have no ticks with exclusive boundaries");
 
-        assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 40);
+        // To get the boundary ticks, need to expand range
+        TickIteratorDown memory iter2 = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 70, 30);
 
-        assertFalse(iter.hasNext());
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 60, "First tick should be 60");
+
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 40, "Second tick should be 40");
+
+        assertFalse(iter2.hasNext());
     }
 
     function test_iterateDown_minTick() public view {
@@ -342,19 +344,17 @@ contract TickIteratorTest is BaseTest {
 
     // ============ Edge Cases ============
 
-    function test_iterateUp_startAfterEnd() public view {
-        // Invalid range: start > end
-        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 100, -100);
-
-        assertFalse(iter.hasNext(), "Invalid range should have no ticks");
+    function test_iterateUp_emptyRange() public view {
+        // Empty range: start == end should have no ticks
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 100, 100);
+        assertFalse(iter.hasNext(), "Empty range should have no ticks");
     }
 
-    function test_iterateDown_startBeforeEnd() public view {
-        // Invalid range: start < end (for down iteration)
+    function test_iterateDown_emptyRange() public view {
+        // Empty range: start == end should have no ticks
         TickIteratorDown memory iter =
-            TickIteratorLib.initDown(manager, pid, TICK_SPACING, -100, 100);
-
-        assertFalse(iter.hasNext(), "Invalid range should have no ticks");
+            TickIteratorLib.initDown(manager, pid, TICK_SPACING, 100, 100);
+        assertFalse(iter.hasNext(), "Empty range should have no ticks");
     }
 
     function test_iterateUp_partialRange() public {
@@ -363,7 +363,7 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
-        // Only iterate middle portion
+        // Only iterate middle portion with exclusive bounds (-50, 50)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -50, 50);
 
         assertTrue(iter.hasNext());
@@ -372,18 +372,355 @@ contract TickIteratorTest is BaseTest {
         assertFalse(iter.hasNext());
     }
 
+    function test_iterateUp_unalignedBounds() public {
+        // Test with unaligned start/end ticks
+        addLiquidityAtTicks(-100, 0);
+        addLiquidityAtTicks(0, 100);
+        addLiquidityAtTicks(100, 200);
+
+        // Start at -99 (unaligned), end at 101 (unaligned)
+        // Exclusive bounds mean we get ticks in range (-99, 101)
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -99, 101);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0, "Should get tick 0");
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 100, "Should get tick 100");
+
+        assertFalse(iter.hasNext());
+    }
+
+    function test_iterateUp_unalignedTickSpacing60() public {
+        // Change to tick spacing 60 for this test
+        key = PoolKey({
+            currency0: Currency.wrap(address(token0)),
+            currency1: Currency.wrap(address(token1)),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        pid = key.toId();
+        manager.initialize(key, INIT_SQRT_PRICE);
+
+        // Add liquidity at aligned ticks for spacing 60
+        router.modifyLiquidity(key, -120, 0, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 0, 120, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 120, 240, int256(1e18), bytes32(0));
+
+        // Test with unaligned start tick 39 (not divisible by 60)
+        // With exclusive bounds (39, 180):
+        // - Start is 39, so we begin searching from tick 60 (next aligned tick after 39)
+        // - End is 180, so we stop before 180
+        // - Initialized ticks in range: 120 (tick 60 is not initialized, only 0 and 120 are)
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, 60, 39, 180);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 120, "Should get tick 120");
+
+        assertFalse(iter.hasNext(), "Should not have more ticks");
+    }
+
     function test_iterateDown_partialRange() public {
         addLiquidityAtTicks(-200, -100);
         addLiquidityAtTicks(-100, 0);
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
-        // Only iterate middle portion
+        // Only iterate middle portion with exclusive bounds (50, -50)
         TickIteratorDown memory iter = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 50, -50);
 
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), 0, "Should only get tick within range");
 
         assertFalse(iter.hasNext());
+    }
+
+    function test_iterateDown_unalignedBounds() public {
+        // Test with unaligned start/end ticks
+        addLiquidityAtTicks(-200, -100);
+        addLiquidityAtTicks(-100, 0);
+        addLiquidityAtTicks(0, 100);
+
+        // Start at 101 (unaligned), end at -99 (unaligned)
+        // Exclusive bounds mean we get ticks in range (101, -99) which excludes both boundaries
+        // So we should get ticks 100, 0, -100 but stop before -99, so only 100 and 0
+        TickIteratorDown memory iter =
+            TickIteratorLib.initDown(manager, pid, TICK_SPACING, 101, -99);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 100);
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0);
+
+        assertFalse(iter.hasNext());
+    }
+
+    function test_iterateDown_unalignedTickSpacing60() public {
+        // Change to tick spacing 60 for this test
+        key = PoolKey({
+            currency0: Currency.wrap(address(token0)),
+            currency1: Currency.wrap(address(token1)),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        pid = key.toId();
+        manager.initialize(key, INIT_SQRT_PRICE);
+
+        // Add liquidity at aligned ticks for spacing 60
+        router.modifyLiquidity(key, -240, -120, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, -120, 0, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 0, 120, int256(1e18), bytes32(0));
+
+        // Test with unaligned start tick 39 (not divisible by 60)
+        // With exclusive bounds (39, -180):
+        // - Start is 39, so we begin searching from tick 0 (prev aligned tick before 39)
+        // - End is -180, so we stop after -180
+        // - Initialized ticks in range: 0, -120
+        TickIteratorDown memory iter = TickIteratorLib.initDown(manager, pid, 60, 39, -180);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0, "Should get tick 0 first");
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), -120, "Should get tick -120");
+
+        assertFalse(iter.hasNext(), "Should not have more ticks");
+    }
+
+    function test_iterateUp_boundaryExclusion() public {
+        // Test that exact boundary ticks are excluded
+        addLiquidityAtTicks(-100, 0);
+        addLiquidityAtTicks(0, 100);
+        addLiquidityAtTicks(100, 200);
+
+        // With exclusive bounds (-100, 100), should not include -100 or 100
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0, "Should only get tick 0");
+
+        assertFalse(iter.hasNext(), "Should not include boundary ticks");
+    }
+
+    function test_iterateDown_boundaryExclusion() public {
+        // Test that exact boundary ticks are excluded
+        addLiquidityAtTicks(-200, -100);
+        addLiquidityAtTicks(-100, 0);
+        addLiquidityAtTicks(0, 100);
+
+        // With exclusive bounds (100, -100), should not include 100 or -100
+        TickIteratorDown memory iter =
+            TickIteratorLib.initDown(manager, pid, TICK_SPACING, 100, -100);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0, "Should only get tick 0");
+
+        assertFalse(iter.hasNext(), "Should not include boundary ticks");
+    }
+
+    function test_iterateUp_adjacentTicks() public {
+        // Test iteration with adjacent initialized ticks
+        addLiquidityAtTicks(0, 10);
+        addLiquidityAtTicks(10, 20);
+        addLiquidityAtTicks(20, 30);
+
+        // Exclusive bounds (-5, 25) should give us 0, 10, 20
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -5, 25);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 10);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 20);
+
+        assertFalse(iter.hasNext());
+    }
+
+    function test_iterateDown_adjacentTicks() public {
+        // Test iteration with adjacent initialized ticks
+        addLiquidityAtTicks(0, 10);
+        addLiquidityAtTicks(10, 20);
+        addLiquidityAtTicks(20, 30);
+
+        // When adding liquidity: tick 0, 10, 20, 30 are initialized
+        // Exclusive bounds (25, -5) excludes both 25 and -5
+        // Based on the iterator implementation, it should iterate from 20 down to 0
+        TickIteratorDown memory iter = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 25, -5);
+
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 20, "first");
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 10);
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 0);
+
+        assertFalse(iter.hasNext());
+
+        // Use a wider range to get all ticks
+        TickIteratorDown memory iter2 =
+            TickIteratorLib.initDown(manager, pid, TICK_SPACING, 35, -10);
+
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 30);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 20, "second");
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 10);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 0);
+
+        assertFalse(iter2.hasNext());
+    }
+
+    // ============ Additional Unaligned Tick Tests ============
+
+    function test_iterateUp_variousUnalignedCases() public {
+        // Test various unaligned tick scenarios with tick spacing 10
+        addLiquidityAtTicks(-100, -50);
+        addLiquidityAtTicks(-50, 0);
+        addLiquidityAtTicks(0, 50);
+        addLiquidityAtTicks(50, 100);
+
+        // Case 1: Start at 3 (unaligned), end at 47 (unaligned)
+        // Should iterate through ticks in range (3, 47): none in this case since next is 50
+        TickIteratorUp memory iter1 = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 3, 47);
+        assertFalse(iter1.hasNext(), "No ticks between 3 and 47");
+
+        // Case 2: Start at -53 (unaligned), end at 53 (unaligned)
+        // Should iterate through ticks in range (-53, 53): -50, 0, 50
+        TickIteratorUp memory iter2 = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -53, 53);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), -50);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 0);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 50);
+        assertFalse(iter2.hasNext());
+
+        // Case 3: Start at -51 (unaligned), end at 1 (unaligned)
+        // Should iterate through ticks in range (-51, 1): -50, 0
+        TickIteratorUp memory iter3 = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -51, 1);
+        assertTrue(iter3.hasNext());
+        assertEq(iter3.getNext(), -50);
+        assertTrue(iter3.hasNext());
+        assertEq(iter3.getNext(), 0);
+        assertFalse(iter3.hasNext());
+    }
+
+    function test_iterateDown_variousUnalignedCases() public {
+        // Test various unaligned tick scenarios with tick spacing 10
+        addLiquidityAtTicks(-100, -50);
+        addLiquidityAtTicks(-50, 0);
+        addLiquidityAtTicks(0, 50);
+        addLiquidityAtTicks(50, 100);
+
+        // Case 1: Start at 47 (unaligned), end at 3 (unaligned)
+        // Should iterate through ticks in range (47, 3): none
+        TickIteratorDown memory iter1 = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 47, 3);
+        assertFalse(iter1.hasNext(), "No ticks between 47 and 3");
+
+        // Case 2: Start at 53 (unaligned), end at -53 (unaligned)
+        // Should iterate through ticks in range (53, -53): 50, 0, -50
+        TickIteratorDown memory iter2 =
+            TickIteratorLib.initDown(manager, pid, TICK_SPACING, 53, -53);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 50);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 0);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), -50);
+        assertFalse(iter2.hasNext());
+
+        // Case 3: Start at 1 (unaligned), end at -51 (unaligned)
+        // Should iterate through ticks in range (1, -51): 0, -50
+        TickIteratorDown memory iter3 = TickIteratorLib.initDown(manager, pid, TICK_SPACING, 1, -51);
+        assertTrue(iter3.hasNext());
+        assertEq(iter3.getNext(), 0);
+        assertTrue(iter3.hasNext());
+        assertEq(iter3.getNext(), -50);
+        assertFalse(iter3.hasNext());
+    }
+
+    function test_iterateUp_unalignedWithLargeSpacing() public {
+        // Test with tick spacing 200 and various unaligned positions
+        key = PoolKey({
+            currency0: Currency.wrap(address(token0)),
+            currency1: Currency.wrap(address(token1)),
+            fee: 10000,
+            tickSpacing: 200,
+            hooks: IHooks(address(0))
+        });
+        pid = key.toId();
+        manager.initialize(key, INIT_SQRT_PRICE);
+
+        // Add liquidity at aligned ticks for spacing 200
+        router.modifyLiquidity(key, -600, -400, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, -400, -200, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, -200, 0, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 0, 200, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 200, 400, int256(1e18), bytes32(0));
+
+        // Test with start tick 39 (39 % 200 = 39, heavily unaligned)
+        // Exclusive bounds (39, 350)
+        // Next aligned tick after 39 is 200, before 350 is 200
+        // So we should only get tick 200
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, 200, 39, 350);
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 200);
+        assertFalse(iter.hasNext());
+
+        // Test with start tick -199 (just after -200)
+        // Exclusive bounds (-199, 201)
+        // Should get 0, 200
+        TickIteratorUp memory iter2 = TickIteratorLib.initUp(manager, pid, 200, -199, 201);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 0);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 200);
+        assertFalse(iter2.hasNext());
+    }
+
+    function test_iterateDown_unalignedWithLargeSpacing() public {
+        // Test with tick spacing 200 and various unaligned positions
+        key = PoolKey({
+            currency0: Currency.wrap(address(token0)),
+            currency1: Currency.wrap(address(token1)),
+            fee: 10000,
+            tickSpacing: 200,
+            hooks: IHooks(address(0))
+        });
+        pid = key.toId();
+        manager.initialize(key, INIT_SQRT_PRICE);
+
+        // Add liquidity at aligned ticks for spacing 200
+        router.modifyLiquidity(key, -400, -200, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, -200, 0, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 0, 200, int256(1e18), bytes32(0));
+        router.modifyLiquidity(key, 200, 400, int256(1e18), bytes32(0));
+
+        // Test with start tick 350 (unaligned)
+        // Exclusive bounds (350, 39)
+        // Previous aligned tick before 350 is 200
+        // Next aligned tick after 39 is 200
+        // So we should only get tick 200
+        TickIteratorDown memory iter = TickIteratorLib.initDown(manager, pid, 200, 350, 39);
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 200);
+        assertFalse(iter.hasNext());
+
+        // Test with start tick 201 (just after 200)
+        // Exclusive bounds (201, -199)
+        // Should get 200, 0
+        TickIteratorDown memory iter2 = TickIteratorLib.initDown(manager, pid, 200, 201, -199);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 200);
+        assertTrue(iter2.hasNext());
+        assertEq(iter2.getNext(), 0);
+        assertFalse(iter2.hasNext());
     }
 }

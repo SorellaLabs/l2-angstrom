@@ -191,7 +191,7 @@ library IUniV4 {
         view
         returns (bool initialized, int24 nextTick)
     {
-        (int16 wordPos, uint8 bitPos) = TickLib.position(TickLib.compress(tick, tickSpacing) - 1);
+        (int16 wordPos, uint8 bitPos) = TickLib.position(TickLib.compress(tick - 1, tickSpacing));
         (initialized, bitPos) = self.getPoolBitmapInfo(id, wordPos).nextBitPosLte(bitPos);
         nextTick = TickLib.toTick(wordPos, bitPos, tickSpacing);
     }

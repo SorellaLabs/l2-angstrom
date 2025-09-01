@@ -2,9 +2,12 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
+import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 
 /// @author philogy <https://github.com/philogy>
 abstract contract HookDeployer is Test {
+    using Hooks for IHooks;
+
     function _newFactory() internal returns (address) {
         return address(new Create2Factory());
     }
@@ -18,7 +21,7 @@ abstract contract HookDeployer is Test {
     function deployHook(
         bytes memory initcode,
         address factory,
-        function(address) internal pure returns (bool) isValidHookAddr
+        Hooks.Permissions memory requiredPermissions
     ) internal returns (bool success, address addr, bytes memory retdata) {
         Create2Params memory params = Create2Params(
             (uint256(0xff) << 160) | uint256(uint160(factory)), 0, keccak256(initcode)
@@ -29,7 +32,11 @@ abstract contract HookDeployer is Test {
                 addr :=
                     and(keccak256(add(params, 11), 85), 0xffffffffffffffffffffffffffffffffffffffff)
             }
-            if (isValidHookAddr(addr)) break;
+
+            if (validateHookPermissions(addr, requiredPermissions)) {
+                break;
+            }
+
             unchecked {
                 params.salt++;
             }
@@ -47,6 +54,31 @@ abstract contract HookDeployer is Test {
                 revert(add(retdata, 0x20), mload(retdata))
             }
         }
+    }
+
+    function validateHookPermissions(address addr, Hooks.Permissions memory requiredPermissions)
+        internal
+        view
+        returns (bool)
+    {
+        try this.__validateHookPermissions(addr, requiredPermissions) {
+            return true;
+        } catch (bytes memory data) {
+            if (bytes4(data) != Hooks.HookAddressNotValid.selector) {
+                assembly ("memory-safe") {
+                    revert(add(data, 0x20), mload(data))
+                }
+            }
+            return false;
+        }
+    }
+
+    function __validateHookPermissions(address addr, Hooks.Permissions memory perms)
+        external
+        pure
+    {
+        IHooks(addr).validateHookPermissions(perms);
+        if (!IHooks(addr).isValidHookAddress(0)) revert Hooks.HookAddressNotValid(addr);
     }
 }
 

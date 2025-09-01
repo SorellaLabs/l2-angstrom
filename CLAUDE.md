@@ -57,19 +57,14 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 
 ### Modules (`src/modules/`)
 - **UniConsumer.sol**: Base Uniswap V4 integration (already used)
-- **PoolUpdates.sol**: Pool state management (may be adapted)
 
 ### Libraries (`src/libraries/`)
 - **TickLib.sol**: Tick math utilities
 - **X128MathLib.sol**: Fixed-point math for rewards
-- **RayMathLib.sol**: Ray math for precise calculations
 
-### Types (`src/types/`)
-- **PoolRewards.sol**: Reward calculation logic (adaptable for tax distribution)
-- **Asset.sol**: Asset pair representation
 
 ### Interfaces (`src/interfaces/`)
-- **IUniV4.sol**: Interface/library for efficiently retrieving state from Uniswap via it's `extsload` & `exttload` methods (use instead of Uniswap's `StateLibrary.sol`), use this as Uniswap doesn't have view methods for most of its state
+- **IUniV4.sol**: Library for efficiently retrieving state from Uniswap's `PoolManager`. `PoolManager` doesn't have view methods so this library provides a local interface that automatically computes the relevant storage slots, dispatches to `extsload` / `exttload` methods and decodes to the appropriate types.
 
 ## Workflow for Implementing New Features and Components
 1. Think about how the new feature is going to be used and plan out appropriate tests

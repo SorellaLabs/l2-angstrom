@@ -38,6 +38,7 @@ library TickLib {
         }
     }
 
+    /// @dev Ensures compression rounds ticks down towards negative infinity. Naive division would result in: `-59 / 60 => 0` & `59 / 60 => 0` vs. `compress(-59, 60) => -1` and `compress(59, 60) => 0`.
     function compress(int24 tick, int24 tickSpacing) internal pure returns (int24 compressed) {
         assembly ("memory-safe") {
             compressed := sub(sdiv(tick, tickSpacing), slt(smod(tick, tickSpacing), 0))

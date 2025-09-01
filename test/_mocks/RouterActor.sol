@@ -29,6 +29,8 @@ contract RouterActor is IUnlockCallback {
         uniV4 = uniV4_;
     }
 
+    receive() external payable {}
+
     function swap(
         PoolKey calldata key,
         bool zeroForOne,
@@ -101,11 +103,12 @@ contract RouterActor is IUnlockCallback {
     }
 
     function recycle(address asset) external {
-        asset.safeTransferAll(msg.sender);
+        Currency currency = Currency.wrap(asset);
+        currency.transfer(msg.sender, currency.balanceOfSelf());
     }
 
     function transfer(address asset, address to, uint256 amount) external {
-        asset.safeTransfer(to, amount);
+        Currency.wrap(asset).transfer(to, amount);
     }
 
     function _swap(PoolKey memory key, SwapParams memory params, bytes memory hookData)
@@ -142,7 +145,7 @@ contract RouterActor is IUnlockCallback {
         unchecked {
             if (amount < 0) {
                 uniV4.sync(currency);
-                Currency.unwrap(currency).safeTransfer(address(uniV4), uint128(-amount));
+                currency.transfer(address(uniV4), uint128(-amount));
                 uniV4.settle();
             } else if (0 < amount) {
                 uniV4.take(currency, address(this), uint128(amount));
