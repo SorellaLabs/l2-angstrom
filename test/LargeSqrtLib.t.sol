@@ -24,7 +24,7 @@ contract LargeSqrtLibTest is Test {
         uint256 pythonResult = pythonFullDivisionSquareRoot(numerator, denominator);
 
         // Call Solidity implementation via external wrapper
-        try this.sqrtX96Wrapper(numerator, denominator) returns (uint160 solidityResult) {
+        try this.sqrtX96Wrapper{gas: 1e6}(numerator, denominator) returns (uint160 solidityResult) {
             // If Solidity succeeds, results should match
             assertEq(
                 uint256(solidityResult), pythonResult, "Results should match when Solidity succeeds"
