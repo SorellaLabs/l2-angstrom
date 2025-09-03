@@ -32,6 +32,7 @@ exclude_lints = [
   "mixed-case-function",
   "incorrect-shift",
   "screaming-snake-case-immutable",
+  "erc20-unchecked-transfer",
 ]
 
 [profile.default.fmt]

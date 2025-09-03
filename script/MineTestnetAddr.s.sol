@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import {BaseScript} from "./BaseScript.sol";
 import {console} from "forge-std/console.sol";
-import {getRequiredHookPermissions} from "src/AngstromL2.sol";
+import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {HookDeployer} from "../test/_helpers/HookDeployer.sol";
 
 /// @author philogy <https://github.com/philogy>
-contract MineTestnetAddrScript is BaseScript, HookDeployer {
+contract MineTestnetAddrScript is HookDeployer, BaseScript {
     function run() public {
         uint256 pk = vm.envUint("TESTNET_PK");
         address owner = vm.addr(pk);

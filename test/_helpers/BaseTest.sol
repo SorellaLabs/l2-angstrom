@@ -228,7 +228,7 @@ contract BaseTest is Test, HookDeployer {
         );
     }
 
-    function setPriorityFee(uint256 fee) internal view {
+    function setPriorityFee(uint256 fee) internal {
         vm.txGasPrice(block.basefee + fee);
     }
 

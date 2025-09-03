@@ -8,6 +8,9 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+
+import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
 /// @author philogy <https://github.com/philogy>
@@ -31,12 +34,24 @@ contract RouterActor is IUnlockCallback {
 
     receive() external payable {}
 
+    function swap(PoolKey calldata key, bool zeroForOne, int256 amountSpecified)
+        external
+        returns (BalanceDelta)
+    {
+        return swap(
+            key,
+            zeroForOne,
+            amountSpecified,
+            zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+        );
+    }
+
     function swap(
         PoolKey calldata key,
         bool zeroForOne,
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96
-    ) external returns (BalanceDelta) {
+    ) public returns (BalanceDelta) {
         bytes memory ret = uniV4.unlock(
             bytes.concat(
                 bytes1(uint8(Action.Swap)),
@@ -117,6 +132,24 @@ contract RouterActor is IUnlockCallback {
     {
         BalanceDelta delta = uniV4.swap(key, params, hookData);
         _settle(key, delta);
+
+        console.log(
+            "router delta0: %s",
+            uniV4.getDelta(address(this), Currency.unwrap(key.currency0)).toStr()
+        );
+        console.log(
+            "router delta1: %s",
+            uniV4.getDelta(address(this), Currency.unwrap(key.currency1)).toStr()
+        );
+        console.log(
+            "hook delta0: %s",
+            uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency0)).toStr()
+        );
+        console.log(
+            "hook delta1: %s",
+            uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency1)).toStr()
+        );
+
         return abi.encode(delta);
     }
 
@@ -145,8 +178,12 @@ contract RouterActor is IUnlockCallback {
         unchecked {
             if (amount < 0) {
                 uniV4.sync(currency);
-                currency.transfer(address(uniV4), uint128(-amount));
-                uniV4.settle();
+                if (currency.isAddressZero()) {
+                    uniV4.settle{value: uint128(-amount)}();
+                } else {
+                    currency.transfer(address(uniV4), uint128(-amount));
+                    uniV4.settle();
+                }
             } else if (0 < amount) {
                 uniV4.take(currency, address(this), uint128(amount));
             }

@@ -39,14 +39,6 @@ SWAP_MEV_TAX_FACTOR = 49        // Tax rate = 49/50 = 98%
 tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 ```
 
-### Hook Permissions Required
-- `beforeInitialize`: Constrain to ETH pools
-- `beforeSwap`: Tax ToB transactions
-- `afterSwap`: Distribute rewards
-- `beforeSwapReturnDelta`: Charge MEV tax
-- `afterAddLiquidity/afterRemoveLiquidity`: Tax JIT liquidity
-- `afterAddLiquidityReturnDelta/afterRemoveLiquidityReturnDelta`: Charge JIT MEV tax
-
 ### Key Functions
 - `beforeSwap()`: Calculates and charges MEV tax on first swap of block
 - `afterSwap()`: Distributes collected tax to LPs
@@ -54,7 +46,6 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 
 
 ## Reusable Components from Original Angstrom
-
 ### Modules (`src/modules/`)
 - **UniConsumer.sol**: Base Uniswap V4 integration (already used)
 
@@ -62,9 +53,8 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 - **TickLib.sol**: Tick math utilities
 - **X128MathLib.sol**: Fixed-point math for rewards
 
-
 ### Interfaces (`src/interfaces/`)
-- **IUniV4.sol**: Library for efficiently retrieving state from Uniswap's `PoolManager`. `PoolManager` doesn't have view methods so this library provides a local interface that automatically computes the relevant storage slots, dispatches to `extsload` / `exttload` methods and decodes to the appropriate types.
+- **IUniV4.sol**: Library for efficiently retrieving state from Uniswap's `PoolManager`. `PoolManager` doesn't have view methods so this library provides a local interface that automatically computes the relevant storage slots, dispatches to `extsload` / `exttload` methods and decodes to the appropriate types. Used by importing and then adding a `using IUniV4 for (UniV4Inspector/IPoolManager);` declaration to the library or contract
 
 ## Workflow for Implementing New Features and Components
 1. Think about how the new feature is going to be used and plan out appropriate tests
@@ -95,3 +85,18 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 - Avoid redundant comments
 - If functionality is not self-explanatory, use longer variable & function names and/or split into more functions
 - Only use comments to document top-level functions & methods
+
+## General tips
+- only use console logs for debugging purposes
+- `assertTrue` & `assertFalse` for asserting boolean values
+- code should be self explanatory, use more descriptive variable and function names if functionality is unclear
+- comments should mainly be used to explain hidden implementation details for problems that intuitively look simple 
+- add short descriptions to assertions so we can tell which ones failed if they do
+- in business logic use `if (!(condition_expected_to_be_true)) revert <AppropriateCustomError>();` for checks
+- in tests use `assertTrue` / `assertFalse` / `assertEq` for test outcomes, use require with an error string to assert conditions for a test utility for example
+
+## Common Mistakes to Avoid
+- **Fix Issues Directly**: When encountering bugs or incompatibilities (like version conflicts or ETH handling issues), fix them directly rather than documenting as limitations. You have full permission to modify any file in the codebase to make things work
+- **Slot0 Usage**: The `IUniV4.getSlot0()` method returns a `Slot0` struct, not individual components. Access fields using methods like `slot0.sqrtPriceX96()` rather than trying to destructure
+- **CREATE2 Factory**: Don't create your own CREATE2 factory - use the existing `_newFactory()` helper from `HookDeployer` or the `CREATE2_FACTORY` constant from forge-std
+- **Hook Deployment**: Use the existing `deployAngstromL2` helper from BaseTest rather than trying to manually deploy hooks - it handles the CREATE2 address mining for proper hook permissions
