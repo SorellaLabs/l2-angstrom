@@ -40,6 +40,7 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
     using SafeCastLib for *;
 
     using FormatLib for *;
+
     error NegationOverflow();
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be a constant so that competing searchers have a bid cost independent of how much gas swap actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
@@ -112,17 +113,27 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
         Slot0 slot0BeforeSwap_ = Slot0.wrap(slot0BeforeSwap.get());
         Slot0 slot0AfterSwap = UNI_V4.getSlot0(id);
 
+        console.log("before init");
         TickIteratorUp memory ticks = TickIteratorLib.initUp(
             UNI_V4, id, key.tickSpacing, slot0BeforeSwap_.tick(), slot0AfterSwap.tick()
         );
+        console.log("before get compensation");
 
         uint256 taxInEther = _getSwapTaxAmount();
-        (uint256 pstarNumerator, uint256 pstarDenominator) = CompensationPriceFinder.getOneForZero(
+        console.log("taxInEther: %s", taxInEther.fmtD());
+        (int24 lastTick, uint256 pstarNumerator, uint256 pstarDenominator) = CompensationPriceFinder
+            .getOneForZero(
             ticks, uint128(liquidityBeforeSwap.get()), taxInEther, slot0BeforeSwap_, slot0AfterSwap
         );
 
         _oneForZeroCreditRewards(
-            ticks, taxInEther, slot0BeforeSwap_, slot0AfterSwap, pstarNumerator, pstarDenominator
+            ticks,
+            taxInEther,
+            slot0BeforeSwap_,
+            slot0AfterSwap,
+            lastTick,
+            pstarNumerator,
+            pstarDenominator
         );
     }
 
@@ -131,18 +142,26 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
         uint256 taxInEther,
         Slot0 slot0BeforeSwap_,
         Slot0 slot0AfterSwap,
+        int24 lastTick,
         uint256 pstarNumerator,
         uint256 pstarDenominator
     ) internal view {
+        console.log("==================== credit rewards ====================");
         ticks.reset(slot0BeforeSwap_.tick());
         uint128 liquidity = uint128(liquidityBeforeSwap.get());
         uint160 priceLowerSqrtX96 = slot0BeforeSwap_.sqrtPriceX96();
         uint160 priceUpperSqrtX96;
+        console.log("p* = %s", pstarNumerator.divWad(pstarDenominator).fmtD());
+        console.log("lastTick: %s", lastTick.toStr());
         while (ticks.hasNext()) {
             int24 tickNext = ticks.getNext();
+            if (tickNext > lastTick) {
+                return;
+            }
+            console.log("got next stick");
 
             priceUpperSqrtX96 = TickMath.getSqrtPriceAtTick(tickNext);
-            uint256 rangeReward;
+            console.log("got next price");
             {
                 uint256 delta0 = SqrtPriceMath.getAmount0Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
@@ -150,17 +169,32 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
+                console.log("god dealt us");
+                console.log("  delta0: %s", delta0.fmtD());
+                console.log("  delta1: %s", delta1.fmtD());
+                console.log("  average range price: %s", delta1.divWad(delta0).fmtD());
 
-                rangeReward = delta0 - delta1.fullMulDiv(pstarDenominator, pstarNumerator);
+                uint256 negativeDelta = delta1.fullMulDiv(pstarDenominator, pstarNumerator);
+                console.log("  negativeDelta: %s", negativeDelta.fmtD());
+                uint256 rangeReward = delta0 - negativeDelta;
+                console.log("calculated range rewards");
+                if (rangeReward > taxInEther) rangeReward = taxInEther;
+                taxInEther -= rangeReward;
+                console.log(
+                    "rangeReward: %s [%s]", rangeReward.fmtD(), delta1.divWad(delta0).fmtD()
+                );
             }
-            if (rangeReward > taxInEther) rangeReward = taxInEther;
-            taxInEther -= rangeReward;
-            console.log("rangeReward:", rangeReward);
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.add(liquidityNet);
+            console.log("change liquidity");
 
             priceLowerSqrtX96 = priceUpperSqrtX96;
+        }
+        console.log("exited loop");
+
+        if (lastTick < type(int24).max) {
+            return;
         }
 
         priceUpperSqrtX96 = slot0AfterSwap.sqrtPriceX96();
@@ -173,7 +207,7 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
         uint256 rangeReward = delta0 - delta1.fullMulDiv(pstarDenominator, pstarNumerator);
         if (rangeReward > taxInEther) rangeReward = taxInEther;
         taxInEther -= rangeReward;
-        console.log("rangeReward:", rangeReward);
+        console.log("rangeReward: %s [%s]", rangeReward.fmtD(), delta1.divWad(delta0).fmtD());
     }
 
     function divX96(uint256 numerator, uint256 denominator) internal pure returns (uint256) {

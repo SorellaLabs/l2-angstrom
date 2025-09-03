@@ -23,15 +23,15 @@ library CompensationPriceFinder {
         uint256 taxInEther,
         Slot0 slot0BeforeSwap,
         Slot0 slot0AfterSwap
-    ) internal view returns (uint256 pstarNumerator, uint256 pstarDenominator) {
+    ) internal view returns (int24 lastTick, uint256 pstarNumerator, uint256 pstarDenominator) {
         uint256 sumAmount0Deltas = 0; // X
         uint256 sumAmount1Deltas = 0; // Y
 
         uint160 priceLowerSqrtX96 = slot0BeforeSwap.sqrtPriceX96();
         uint160 priceUpperSqrtX96;
         while (ticks.hasNext()) {
-            int24 tickNext = ticks.getNext();
-            priceUpperSqrtX96 = TickMath.getSqrtPriceAtTick(tickNext);
+            lastTick = ticks.getNext();
+            priceUpperSqrtX96 = TickMath.getSqrtPriceAtTick(lastTick);
 
             sumAmount0Deltas += SqrtPriceMath.getAmount0Delta(
                 priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
@@ -43,12 +43,13 @@ library CompensationPriceFinder {
             if (sumAmount0Deltas > taxInEther) {
                 uint256 denominator = sumAmount0Deltas - taxInEther;
                 uint256 effectiveExecutionPriceX96 = divX96(sumAmount1Deltas, denominator);
-                if (effectiveExecutionPriceX96 <= mulX96(priceUpperSqrtX96, priceUpperSqrtX96)) {
-                    return (sumAmount1Deltas, denominator);
+                uint256 priceUpper = mulX96(priceUpperSqrtX96, priceUpperSqrtX96);
+                if (effectiveExecutionPriceX96 <= priceUpper) {
+                    return (lastTick, sumAmount1Deltas, denominator);
                 }
             }
 
-            (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
+            (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, lastTick);
             liquidity = liquidity.add(liquidityNet);
 
             priceLowerSqrtX96 = priceUpperSqrtX96;
@@ -61,7 +62,7 @@ library CompensationPriceFinder {
         sumAmount1Deltas +=
             SqrtPriceMath.getAmount1Delta(priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false);
 
-        return (sumAmount1Deltas, sumAmount0Deltas - taxInEther);
+        return (type(int24).max, sumAmount1Deltas, sumAmount0Deltas - taxInEther);
     }
 
     function divX96(uint256 numerator, uint256 denominator) internal pure returns (uint256) {

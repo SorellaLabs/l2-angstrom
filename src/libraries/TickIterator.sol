@@ -5,6 +5,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {TickLib} from "./TickLib.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
+
 import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
@@ -57,6 +58,9 @@ library TickIteratorLib {
     ) internal view returns (TickIteratorUp memory self) {
         if (!(startTick <= endTick)) revert InvalidRange();
 
+        console.log("startTick: %s", startTick.toStr());
+        console.log("endTick: %s", endTick.toStr());
+
         self.manager = manager;
         self.poolId = poolId;
         self.tickSpacing = tickSpacing;
@@ -96,6 +100,7 @@ library TickIteratorLib {
     function getNext(TickIteratorUp memory self) internal view returns (int24 tick) {
         require(hasNext(self), "No more ticks");
         tick = self.currentTick;
+        console.log("tick: %s", tick.toStr());
         _advanceToNextUp(self);
     }
 
