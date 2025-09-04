@@ -17,7 +17,7 @@ contract LargeSqrtLibTest is Test {
         return LargeSqrtLib.sqrtX96(numerator, denominator);
     }
 
-    function testDifferentialSqrtX96(uint256 numerator, uint256 denominator) public {
+    function test_fuzzing_ffi_DifferentialSqrtX96(uint256 numerator, uint256 denominator) public {
         vm.assume(denominator > 0);
         vm.assume(numerator / denominator < 1 << 128);
 
@@ -38,7 +38,7 @@ contract LargeSqrtLibTest is Test {
         }
     }
 
-    function testSpecificCases() public {
+    function test_ffi_specificCases() public {
         // Test edge case: equal numerator and denominator (should give 2^96)
         assertEqPython(1000, 1000, 1 << 96);
 

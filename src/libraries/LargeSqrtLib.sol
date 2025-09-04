@@ -71,7 +71,7 @@ library LargeSqrtLib {
             inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**32
             inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**64
             inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**128
-            // `x0` replaces `z`, `r1` replaces `p1`, final 256-bit result stored in `y0`
+            // Edits vs Solady: `x0` replaces `z`, `r1` replaces `p1`, final 256-bit result stored in `y0`
             y0 :=
                 mul(
                     or(mul(sub(r1, gt(r, x0)), add(div(sub(0, t), t), 1)), div(sub(x0, r), t)),
