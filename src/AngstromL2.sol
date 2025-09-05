@@ -26,7 +26,6 @@ import {PoolRewards} from "./types/PoolRewards.sol";
 import {PoolKeyHelperLib} from "./libraries/PoolKeyHelperLib.sol";
 import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
-import {LargeSqrtLib} from "./libraries/LargeSqrtLib.sol";
 
 import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
