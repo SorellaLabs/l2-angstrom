@@ -100,7 +100,7 @@ library TickIteratorLib {
     function getNext(TickIteratorUp memory self) internal view returns (int24 tick) {
         require(hasNext(self), "No more ticks");
         tick = self.currentTick;
-        console.log("tick: %s", tick.toStr());
+        console.log("=> tick: %s", tick.toStr());
         _advanceToNextUp(self);
     }
 

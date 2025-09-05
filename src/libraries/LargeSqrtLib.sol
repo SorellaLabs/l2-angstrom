@@ -9,8 +9,8 @@ library LargeSqrtLib {
     using FixedPointMathLib for uint256;
 
     error SquareRouteResultOverflow();
-    error IntermediateGuessOverflow();
 
+    /// @dev Compute `sqrt(numerator / denominator) * 2^96` with full precision
     function sqrtX96(uint256 numerator, uint256 denominator)
         internal
         pure
@@ -30,25 +30,27 @@ library LargeSqrtLib {
 
         // The square root of a value larger than 320 bits is guaranteed not to fit in 160 bits
         if (!(x1 < 1 << 64)) revert SquareRouteResultOverflow();
-        uint64 sx1 = uint64(x1);
-        uint64 g1;
-        uint256 g0 = 1 << (128 + (LibBit.fls(sx1) / 2));
+        return sqrt320(uint64(x1), x0);
+    }
+
+    function sqrt320(uint64 x1, uint256 x0) internal pure returns (uint160 root) {
+        uint256 g0 = 1 << (128 + (LibBit.fls(x1) / 2));
         uint256 last;
         do {
             last = g0;
-            (g1, g0) = div320by256(sx1, x0, g0);
+            // Our estimates are at least 2^128 or larger which means we're guaranteed to receive
+            // a <256-bit result from division, meaning we can ignore `y1`.
+            (, g0) = div320by256(x1, x0, g0);
             g0 = (g0 + last) / 2;
-            // Our initial guess should be close enough that this revert should never be hit
-            if (g1 != 0) revert IntermediateGuessOverflow();
         } while (g0 != last);
         return uint160(g0);
     }
 
     /// @dev Computes `[x1 x0] / d`
-    function div320by256(uint64 x1, uint256 x0, uint256 d)
+    function div320by256(uint256 x1, uint256 x0, uint256 d)
         internal
         pure
-        returns (uint64 y1, uint256 y0)
+        returns (uint256 y1, uint256 y0)
     {
         assembly ("memory-safe") {
             // Compute first "digit" of long division result

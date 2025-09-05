@@ -26,6 +26,7 @@ import {PoolRewards} from "./types/PoolRewards.sol";
 import {PoolKeyHelperLib} from "./libraries/PoolKeyHelperLib.sol";
 import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
+import {LargeSqrtLib} from "./libraries/LargeSqrtLib.sol";
 
 import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -121,19 +122,12 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
 
         uint256 taxInEther = _getSwapTaxAmount();
         console.log("taxInEther: %s", taxInEther.fmtD());
-        (int24 lastTick, uint256 pstarNumerator, uint256 pstarDenominator) = CompensationPriceFinder
-            .getOneForZero(
+        (int24 lastTick, uint160 pstarSqrtX96) = CompensationPriceFinder.getOneForZero(
             ticks, uint128(liquidityBeforeSwap.get()), taxInEther, slot0BeforeSwap_, slot0AfterSwap
         );
 
         _oneForZeroCreditRewards(
-            ticks,
-            taxInEther,
-            slot0BeforeSwap_,
-            slot0AfterSwap,
-            lastTick,
-            pstarNumerator,
-            pstarDenominator
+            ticks, taxInEther, slot0BeforeSwap_, slot0AfterSwap, lastTick, pstarSqrtX96
         );
     }
 
@@ -143,25 +137,25 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
         Slot0 slot0BeforeSwap_,
         Slot0 slot0AfterSwap,
         int24 lastTick,
-        uint256 pstarNumerator,
-        uint256 pstarDenominator
+        uint160 pstarSqrtX96
     ) internal view {
         console.log("==================== credit rewards ====================");
         ticks.reset(slot0BeforeSwap_.tick());
         uint128 liquidity = uint128(liquidityBeforeSwap.get());
         uint160 priceLowerSqrtX96 = slot0BeforeSwap_.sqrtPriceX96();
         uint160 priceUpperSqrtX96;
-        console.log("p* = %s", pstarNumerator.divWad(pstarDenominator).fmtD());
-        console.log("lastTick: %s", lastTick.toStr());
+
+        uint256 pstarX96 = mulX96(pstarSqrtX96, pstarSqrtX96);
+
         while (ticks.hasNext()) {
             int24 tickNext = ticks.getNext();
             if (tickNext > lastTick) {
+                console.log("remainder: %s", taxInEther.fmtD(18));
+                console.log("==================== credit rewards end ====================");
                 return;
             }
-            console.log("got next stick");
 
-            priceUpperSqrtX96 = TickMath.getSqrtPriceAtTick(tickNext);
-            console.log("got next price");
+            priceUpperSqrtX96 = min(TickMath.getSqrtPriceAtTick(tickNext), pstarSqrtX96);
             {
                 uint256 delta0 = SqrtPriceMath.getAmount0Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
@@ -169,45 +163,50 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
-                console.log("god dealt us");
                 console.log("  delta0: %s", delta0.fmtD());
                 console.log("  delta1: %s", delta1.fmtD());
-                console.log("  average range price: %s", delta1.divWad(delta0).fmtD());
+                //console.log("  average range price: %s", delta1.divWad(delta0).fmtD());
 
-                uint256 negativeDelta = delta1.fullMulDiv(pstarDenominator, pstarNumerator);
+                uint256 negativeDelta = divX96(delta1, pstarX96);
                 console.log("  negativeDelta: %s", negativeDelta.fmtD());
-                uint256 rangeReward = delta0 - negativeDelta;
-                console.log("calculated range rewards");
-                if (rangeReward > taxInEther) rangeReward = taxInEther;
-                taxInEther -= rangeReward;
+                uint256 rangeReward = (delta0 - negativeDelta).min(taxInEther);
                 console.log(
-                    "rangeReward: %s [%s]", rangeReward.fmtD(), delta1.divWad(delta0).fmtD()
+                    "  rangeReward: %s [%s]",
+                    rangeReward.fmtD(18),
+                    ((delta0 - negativeDelta) - rangeReward).fmtD(18)
                 );
+                taxInEther -= rangeReward.min(taxInEther);
             }
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.add(liquidityNet);
-            console.log("change liquidity");
 
             priceLowerSqrtX96 = priceUpperSqrtX96;
         }
-        console.log("exited loop");
+
+        console.log("=> final range");
 
         if (lastTick < type(int24).max) {
             return;
         }
 
-        priceUpperSqrtX96 = slot0AfterSwap.sqrtPriceX96();
+        priceUpperSqrtX96 = min(slot0AfterSwap.sqrtPriceX96(), pstarSqrtX96);
 
         uint256 delta0 =
             SqrtPriceMath.getAmount0Delta(priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false);
         uint256 delta1 =
             SqrtPriceMath.getAmount1Delta(priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false);
 
-        uint256 rangeReward = delta0 - delta1.fullMulDiv(pstarDenominator, pstarNumerator);
-        if (rangeReward > taxInEther) rangeReward = taxInEther;
+        uint256 rangeReward = (delta0 - divX96(delta1, pstarX96)).min(taxInEther);
+        console.log(
+            "  rangeReward: %s [%s]",
+            rangeReward.fmtD(18),
+            (delta0 - divX96(delta1, pstarX96) - rangeReward).fmtD(18)
+        );
         taxInEther -= rangeReward;
-        console.log("rangeReward: %s [%s]", rangeReward.fmtD(), delta1.divWad(delta0).fmtD());
+
+        console.log("remainder: %s", taxInEther.fmtD(18));
+        console.log("==================== credit rewards end ====================");
     }
 
     function divX96(uint256 numerator, uint256 denominator) internal pure returns (uint256) {
@@ -216,6 +215,10 @@ contract AngstromL2 is UniConsumer, IBeforeSwapHook, IAfterSwapHook {
 
     function mulX96(uint256 x, uint256 y) internal pure returns (uint256) {
         return FixedPointMathLib.fullMulDivN(x, y, FixedPoint96.RESOLUTION);
+    }
+
+    function min(uint160 x, uint160 y) internal pure returns (uint160) {
+        return x < y ? x : y;
     }
 
     function _getBlock() internal view returns (uint64) {
