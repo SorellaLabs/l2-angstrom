@@ -141,7 +141,7 @@ contract AngstromL2Test is BaseTest {
         Slot0 slot0 = manager.getSlot0(id);
         console.log("slot0.tick():", slot0.tick().toStr());
 
-        setPriorityFee(130 gwei);
+        setPriorityFee(0.7 gwei);
         BalanceDelta swapOut = router.swap(key, false, 7.2e18);
 
         console.log("swapOut.amount0(): %s", swapOut.amount0().fmtD());

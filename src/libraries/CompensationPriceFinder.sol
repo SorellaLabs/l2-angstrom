@@ -51,6 +51,22 @@ library CompensationPriceFinder {
                 );
                 sumAmount0Deltas += delta0;
                 sumAmount1Deltas += delta1;
+
+                if (sumAmount0Deltas > taxInEther) {
+                    uint256 simplePstarX96 = divX96(sumAmount1Deltas, sumAmount0Deltas - taxInEther);
+                    if (simplePstarX96 <= mulX96(priceUpperSqrtX96, priceUpperSqrtX96)) {
+                        pstarSqrtX96 = _oneForZeroGetFinalCompensationPrice(
+                            liquidity,
+                            priceLowerSqrtX96,
+                            priceUpperSqrtX96,
+                            taxInEther,
+                            sumAmount0Deltas - delta0,
+                            sumAmount1Deltas - delta1
+                        );
+
+                        return (lastTick, pstarSqrtX96);
+                    }
+                }
             }
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, lastTick);
@@ -122,27 +138,23 @@ library CompensationPriceFinder {
         uint256 sumUpToThisRange0,
         uint256 sumUpToThisRange1
     ) internal pure returns (bool, uint256, uint256) {
-        uint256 a;
+        uint256 rangeVirtualReserves0 = divX96(liquidity, priceLowerSqrtX96);
+        uint256 rangeVirtualReserves1 = mulX96(liquidity, priceLowerSqrtX96);
+        uint256 a = rangeVirtualReserves0 + sumUpToThisRange0 - compensationAmount0;
         uint256 d1;
         uint256 d0;
         {
-            uint256 rangeVirtualReserves0 = divX96(liquidity, priceLowerSqrtX96);
-            uint256 rangeVirtualReserves1 = mulX96(liquidity, priceLowerSqrtX96);
-            a = rangeVirtualReserves0 + sumUpToThisRange0 - compensationAmount0;
-
-            {
-                (uint256 x1, uint256 x0) = Math512Lib.fullMul(sumUpToThisRange1, a);
-                if (sumUpToThisRange0 >= compensationAmount0) {
-                    (d1, d0) = Math512Lib.fullMul(
-                        rangeVirtualReserves1, sumUpToThisRange0 - compensationAmount0
-                    );
-                    (d1, d0) = Math512Lib.checkedSub(x1, x0, d1, d0);
-                } else {
-                    (d1, d0) = Math512Lib.fullMul(
-                        rangeVirtualReserves1, compensationAmount0 - sumUpToThisRange0
-                    );
-                    (d1, d0) = Math512Lib.checkedAdd(x1, x0, d1, d0);
-                }
+            (uint256 x1, uint256 x0) = Math512Lib.fullMul(sumUpToThisRange1, a);
+            if (sumUpToThisRange0 >= compensationAmount0) {
+                (d1, d0) = Math512Lib.fullMul(
+                    rangeVirtualReserves1, sumUpToThisRange0 - compensationAmount0
+                );
+                (d1, d0) = Math512Lib.checkedSub(x1, x0, d1, d0);
+            } else {
+                (d1, d0) = Math512Lib.fullMul(
+                    rangeVirtualReserves1, compensationAmount0 - sumUpToThisRange0
+                );
+                (d1, d0) = Math512Lib.checkedAdd(x1, x0, d1, d0);
             }
         }
         (d1, d0) = Math512Lib.checkedMul2Pow192(d1, d0);
