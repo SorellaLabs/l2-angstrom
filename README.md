@@ -8,8 +8,8 @@ This repository contains the core contracts for the L2 Angstrom hook.
 
 **Solve Following System of Equations for $\sqrt {p_*}$**
 
-$$ \Delta x = L_i \cdot (\frac {1} {\sqrt {p_*}} - \frac {1}{\sqrt {p_u}}) $$
-$$ \Delta y = L_i \cdot (\sqrt{p_u} - \sqrt{p_*}) $$
+$$ \Delta x = L_i \cdot (\frac {1} {\sqrt {p_{*}}} - \frac {1}{\sqrt {p_u}}) $$
+$$ \Delta y = L_i \cdot (\sqrt{p_u} - \sqrt{p_{*}}) $$
 $$ B = (\hat Y + \Delta y) \cdot \frac {1}{p_*} - (\hat X + \Delta x)$$ 
 
 **Result:**
