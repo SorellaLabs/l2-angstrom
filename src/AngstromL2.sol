@@ -252,7 +252,7 @@ contract AngstromL2 is
             priceLowerSqrtX96 = max(TickMath.getSqrtPriceAtTick(tickNext), pstarSqrtX96);
 
             uint256 rangeReward = 0;
-            if (tickNext >= lastTick || liquidity == 0) {
+            if (tickNext >= lastTick && liquidity != 0) {
                 uint256 delta0 = SqrtPriceMath.getAmount0Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );

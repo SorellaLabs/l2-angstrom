@@ -85,7 +85,7 @@ library CompensationPriceFinder {
         sumAmount1Deltas += delta1;
 
         uint256 simplePstarX96 = sumAmount1Deltas.divX96(sumAmount0Deltas + taxInEther);
-        if (simplePstarX96 <= uint256(priceLowerSqrtX96).mulX96(priceLowerSqrtX96)) {
+        if (simplePstarX96 > uint256(priceLowerSqrtX96).mulX96(priceLowerSqrtX96)) {
             pstarSqrtX96 = _zeroForOneGetFinalCompensationPrice(
                 priceUpperSqrtX96,
                 taxInEther,

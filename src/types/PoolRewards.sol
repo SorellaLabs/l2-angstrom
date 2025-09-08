@@ -81,8 +81,7 @@ library PoolRewardsLib {
 
         uint128 newLiquidity = pm.getPositionLiquidity(id, positionKey);
         if (!(params.liquidityDelta >= 0)) revert NegativeDeltaForAdd();
-        uint128 liquidityDelta = uint128(uint256(params.liquidityDelta));
-        uint128 lastLiquidity = newLiquidity - liquidityDelta;
+        uint128 lastLiquidity = newLiquidity.sub(params.liquidityDelta.toInt128());
 
         if (lastLiquidity == 0) {
             position.lastGrowthInsideX128 = growthInside;
@@ -117,8 +116,9 @@ library PoolRewardsLib {
                 self.getGrowthInsideX128(currentTick, params.tickLower, params.tickUpper);
 
             uint128 newPositionLiquidity = pm.getPositionLiquidity(id, positionKey);
+            if (!(0 >= params.liquidityDelta)) revert PositiveDeltaForRemove();
             uint128 lastPositionLiquidity =
-                newPositionLiquidity.add(params.liquidityDelta.toInt128());
+                newPositionLiquidity.sub(params.liquidityDelta.toInt128());
             rewards = FixedPointMathLib.fullMulDivN(
                 growthInsideX128 - position.lastGrowthInsideX128, lastPositionLiquidity, 128
             );
