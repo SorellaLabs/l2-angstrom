@@ -1,22 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
-import {
-    TickIteratorLib, TickIteratorUp, TickIteratorDown
-} from "../../src/libraries/TickIterator.sol";
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {IUniV4} from "../../src/interfaces/IUniV4.sol";
 import {BaseTest} from "../_helpers/BaseTest.sol";
 import {RouterActor} from "../_mocks/RouterActor.sol";
 import {UniV4Inspector} from "../_mocks/UniV4Inspector.sol";
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
-import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 

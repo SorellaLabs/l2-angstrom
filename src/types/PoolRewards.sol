@@ -8,8 +8,6 @@ import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {TickLib} from "../libraries/TickLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 struct PoolRewards {
     mapping(bytes32 uniPositionKey => Position position) positions;
     mapping(int24 tick => uint256 growthOutsideX128) rewardGrowthOutsideX128;

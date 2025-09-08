@@ -1,20 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IUniV4, IPoolManager, PoolId} from "../interfaces/IUniV4.sol";
+import {IUniV4, IPoolManager} from "../interfaces/IUniV4.sol";
 import {Slot0} from "v4-core/src/types/Slot0.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {SqrtPriceMath} from "v4-core/src/libraries/SqrtPriceMath.sol";
 import {MixedSignLib} from "../libraries/MixedSignLib.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
-import {FixedPoint96} from "v4-core/src/libraries/FixedPoint96.sol";
 import {TickIteratorUp, TickIteratorDown} from "./TickIterator.sol";
 import {Math512Lib} from "./Math512Lib.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 import {Q96MathLib} from "./Q96MathLib.sol";
-
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
 /// @author philogy <https://github.com/philogy>
 library CompensationPriceFinder {
@@ -23,8 +19,6 @@ library CompensationPriceFinder {
     using FixedPointMathLib for uint256;
     using SafeCastLib for uint256;
     using Q96MathLib for uint256;
-
-    using FormatLib for *;
 
     function getZeroForOne(
         TickIteratorDown memory ticks,

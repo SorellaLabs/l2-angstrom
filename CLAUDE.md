@@ -100,3 +100,5 @@ tax = priority_fee * SWAP_TAXED_GAS * SWAP_MEV_TAX_FACTOR
 - **Slot0 Usage**: The `IUniV4.getSlot0()` method returns a `Slot0` struct, not individual components. Access fields using methods like `slot0.sqrtPriceX96()` rather than trying to destructure
 - **CREATE2 Factory**: Don't create your own CREATE2 factory - use the existing `_newFactory()` helper from `HookDeployer` or the `CREATE2_FACTORY` constant from forge-std
 - **Hook Deployment**: Use the existing `deployAngstromL2` helper from BaseTest rather than trying to manually deploy hooks - it handles the CREATE2 address mining for proper hook permissions
+- Cleanup no longer needed console.log statements once you're done
+- Use `/// forge-lint: disable-next-line(directives)` to silence lints, only do so if explicitly directed

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
 import {
     TickIteratorLib, TickIteratorUp, TickIteratorDown
 } from "../../src/libraries/TickIterator.sol";
@@ -10,7 +9,6 @@ import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {IUniV4} from "../../src/interfaces/IUniV4.sol";
 import {BaseTest} from "../_helpers/BaseTest.sol";
 import {RouterActor} from "../_mocks/RouterActor.sol";
@@ -200,6 +198,7 @@ contract TickIteratorTest is BaseTest {
 
     function test_iterateUp_maxTick() public view {
         // Test near maximum tick (must be aligned to tick spacing)
+        /// forge-lint: disable-next-line(divide-before-multiply)
         int24 maxAlignedTick = (TickMath.MAX_TICK / TICK_SPACING) * TICK_SPACING;
         int24 nearMaxTick = maxAlignedTick - TICK_SPACING;
 
@@ -332,6 +331,7 @@ contract TickIteratorTest is BaseTest {
 
     function test_iterateDown_minTick() public view {
         // Test near minimum tick (must be aligned to tick spacing)
+        /// forge-lint: disable-next-line(divide-before-multiply)
         int24 minAlignedTick = (TickMath.MIN_TICK / TICK_SPACING) * TICK_SPACING;
         int24 nearMinTick = minAlignedTick + TICK_SPACING;
 
