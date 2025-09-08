@@ -39,6 +39,7 @@ library TickIteratorLib {
     using IUniV4 for IPoolManager;
 
     error InvalidRange();
+    error NoNext();
 
     // ============ Upward Iterator (Low to High) ============
 
@@ -91,16 +92,15 @@ library TickIteratorLib {
     /// @param self The iterator
     /// @return True if there are more ticks to iterate
     function hasNext(TickIteratorUp memory self) internal pure returns (bool) {
-        return self.currentTick < self.endTick;
+        return self.currentTick <= self.endTick;
     }
 
     /// @notice Get the next tick and advance the iterator
     /// @param self The iterator
     /// @return tick The next initialized tick
     function getNext(TickIteratorUp memory self) internal view returns (int24 tick) {
-        require(hasNext(self), "No more ticks");
+        if (!hasNext(self)) revert NoNext();
         tick = self.currentTick;
-        console.log("=> tick: %s", tick.toStr());
         _advanceToNextUp(self);
     }
 
@@ -175,7 +175,7 @@ library TickIteratorLib {
     /// @param self The iterator
     /// @return tick The next initialized tick
     function getNext(TickIteratorDown memory self) internal view returns (int24 tick) {
-        require(hasNext(self), "No more ticks");
+        if (!hasNext(self)) revert NoNext();
         tick = self.currentTick;
         _advanceToNextDown(self);
     }

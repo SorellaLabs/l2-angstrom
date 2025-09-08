@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {LibBit} from "solady/src/utils/LibBit.sol";
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 
 /// @author philogy <https://github.com/philogy>
 library Math512Lib {
@@ -68,6 +69,9 @@ library Math512Lib {
     }
 
     function sqrt512(uint256 x1, uint256 x0) internal pure returns (uint256 root) {
+        if (x1 == 0) {
+            return FixedPointMathLib.sqrt(x0);
+        }
         root = 1 << (128 + (LibBit.fls(x1) / 2));
         uint256 last;
         do {

@@ -133,22 +133,19 @@ contract RouterActor is IUnlockCallback {
         BalanceDelta delta = uniV4.swap(key, params, hookData);
         _settle(key, delta);
 
-        console.log(
-            "router delta0: %s",
-            uniV4.getDelta(address(this), Currency.unwrap(key.currency0)).toStr()
-        );
-        console.log(
-            "router delta1: %s",
-            uniV4.getDelta(address(this), Currency.unwrap(key.currency1)).toStr()
-        );
-        console.log(
-            "hook delta0: %s",
-            uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency0)).toStr()
-        );
-        console.log(
-            "hook delta1: %s",
-            uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency1)).toStr()
-        );
+        int256 routerDelta0 = uniV4.getDelta(address(this), Currency.unwrap(key.currency0));
+        int256 routerDelta1 = uniV4.getDelta(address(this), Currency.unwrap(key.currency1));
+        if (routerDelta0 != 0 || routerDelta1 != 0) {
+            console.log("router delta0: %s", routerDelta0.toStr());
+            console.log("router delta1: %s", routerDelta1.toStr());
+        }
+
+        int256 hookDelta0 = uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency0));
+        int256 hookDelta1 = uniV4.getDelta(address(key.hooks), Currency.unwrap(key.currency1));
+        if (hookDelta0 != 0 || hookDelta1 != 0) {
+            console.log("hook delta0: %s", hookDelta0.toStr());
+            console.log("hook delta1: %s", hookDelta1.toStr());
+        }
 
         return abi.encode(delta);
     }

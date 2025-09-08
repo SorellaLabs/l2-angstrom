@@ -14,6 +14,7 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
@@ -31,6 +32,7 @@ contract AngstromL2Test is BaseTest {
     using FormatLib for *;
     using PoolIdLibrary for PoolKey;
     using IUniV4 for UniV4Inspector;
+    using TickMath for int24;
 
     UniV4Inspector manager;
     RouterActor router;
@@ -59,10 +61,7 @@ contract AngstromL2Test is BaseTest {
         );
     }
 
-    /// @notice Helper to initialize a pool with given token and native ETH
-    /// @param asset1 The ERC20 token to pair with ETH
-    /// @return key The pool key for the initialized pool
-    function initializePool(address asset1, int24 tickSpacing)
+    function initializePool(address asset1, int24 tickSpacing, int24 startTick)
         internal
         returns (PoolKey memory key)
     {
@@ -76,7 +75,7 @@ contract AngstromL2Test is BaseTest {
             hooks: IHooks(address(angstrom))
         });
 
-        manager.initialize(key, INIT_SQRT_PRICE);
+        manager.initialize(key, TickMath.getSqrtPriceAtTick(startTick));
 
         return key;
     }
@@ -100,54 +99,118 @@ contract AngstromL2Test is BaseTest {
             key, tickLower, tickUpper, int256(uint256(liquidityAmount)), bytes32(0)
         );
 
-        console.log("delta.amount0(): %s", delta.amount0().fmtD());
-        console.log("delta.amount1(): %s", delta.amount1().fmtD());
+        // console.log("delta.amount0(): %s", delta.amount0().fmtD());
+        // console.log("delta.amount1(): %s", delta.amount1().fmtD());
 
         return delta;
     }
 
-    /// @notice Test pool initialization
-    function test_initializePool() public {
-        PoolKey memory key = initializePool(address(token), 60);
-
-        PoolId id = key.toId();
-        Slot0 slot0 = manager.getSlot0(id);
-        assertEq(slot0.sqrtPriceX96(), INIT_SQRT_PRICE, "Pool not initialized at expected price");
+    function getRewards(PoolId id, int24 tickLower, int24 tickUpper)
+        internal
+        view
+        returns (uint256)
+    {
+        return angstrom.getPendingPositionRewards(
+            id, address(router), tickLower, tickUpper, bytes32(0)
+        );
     }
 
-    /// @notice Test adding liquidity
-    function test_addLiquidity() public {
-        PoolKey memory key = initializePool(address(token), 60);
+    function setupSimpleZeroForOnePositions(PoolKey memory key) internal {
         PoolId id = key.toId();
 
-        int24 tickLower = -60;
-        int24 tickUpper = 60;
-        uint128 liquidityAmount = 1e18;
+        addLiquidity(key, -10, 20, 10e21);
+        addLiquidity(key, -20, 0, 2e21);
+        addLiquidity(key, -20, -10, 3e21);
+        addLiquidity(key, -40, -30, 0.8e21);
 
-        addLiquidity(key, tickLower, tickUpper, liquidityAmount);
-
-        uint128 liquidity = manager.getPoolLiquidity(id);
-        assertGt(liquidity, 0, "No liquidity added to pool");
+        assertEq(getRewards(id, -10, 20), 0);
+        assertEq(getRewards(id, -20, 0), 0);
+        assertEq(getRewards(id, -20, -10), 0);
+        assertEq(getRewards(id, -40, -30), 0);
     }
 
-    function test_simpleSwap() public {
-        PoolKey memory key = initializePool(address(token), 10);
+    function test_simpleZeroForOneSwap1() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
         PoolId id = key.toId();
 
-        addLiquidity(key, -10, 10, 10e21);
-        addLiquidity(key, 10, 20, 2e21);
-        addLiquidity(key, 240, 300, 0.8e21);
-
-        Slot0 slot0 = manager.getSlot0(id);
-        console.log("slot0.tick():", slot0.tick().toStr());
+        setupSimpleZeroForOnePositions(key);
 
         setPriorityFee(0.7 gwei);
-        BalanceDelta swapOut = router.swap(key, false, 7.2e18);
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
 
-        console.log("swapOut.amount0(): %s", swapOut.amount0().fmtD());
-        console.log("swapOut.amount1(): %s", swapOut.amount1().fmtD());
+        assertEq(getRewards(id, -10, 20), 0.003099217600434384e18, "wrong rewards for [-10, 20]");
+        assertEq(getRewards(id, -20, 0), 0.000330782399565614e18, "wrong rewards for [-20, 0]");
+        assertEq(getRewards(id, -20, -10), 0, "wrong rewards for [-20, -10]");
+        assertEq(getRewards(id, -40, -30), 0, "wrong rewards for [-40, -30]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(0.7 gwei),
+            getRewards(id, -10, 20) + getRewards(id, -20, 0),
+            10,
+            "wrong tax total"
+        );
+    }
 
-        slot0 = manager.getSlot0(id);
-        console.log("slot0.tick():", slot0.tick().toStr());
+    function test_simpleZeroForOneSwap2() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleZeroForOnePositions(key);
+
+        setPriorityFee(1.3 gwei);
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -10, 20), 0.005602270037068238e18, "wrong rewards for [-10, 20]");
+        assertEq(getRewards(id, -20, 0), 0.000734179067847244e18, "wrong rewards for [-20, 0]");
+        assertEq(getRewards(id, -20, -10), 0.000033550895084515e18, "wrong rewards for [-20, -10]");
+        assertEq(getRewards(id, -40, -30), 0, "wrong rewards for [-40, -30]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(1.3 gwei),
+            getRewards(id, -10, 20) + getRewards(id, -20, 0) + getRewards(id, -20, -10),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleZeroForOneSwap3() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleZeroForOnePositions(key);
+
+        setPriorityFee(2.6 gwei);
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -10, 20), 0.01024433477037636e18, "wrong rewards for [-10, 20]");
+        assertEq(getRewards(id, -20, 0), 0.00185381931995983e18, "wrong rewards for [-20, 0]");
+        assertEq(getRewards(id, -20, -10), 0.000641845909663807e18, "wrong rewards for [-20, -10]");
+        assertEq(getRewards(id, -40, -30), 0, "wrong rewards for [-40, -30]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(2.6 gwei),
+            getRewards(id, -10, 20) + getRewards(id, -20, 0) + getRewards(id, -20, -10),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleZeroForOneSwap4() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleZeroForOnePositions(key);
+
+        setPriorityFee(5.4 gwei);
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -10, 20), 0.019162626216729137e18, "wrong rewards for [-10, 20]");
+        assertEq(getRewards(id, -20, 0), 0.004594179393652089e18, "wrong rewards for [-20, 0]");
+        assertEq(getRewards(id, -20, -10), 0.00269447311968076e18, "wrong rewards for [-20, -10]");
+        assertEq(getRewards(id, -40, -30), 0.000008721269938012e18, "wrong rewards for [-40, -30]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(5.4 gwei),
+            getRewards(id, -10, 20) + getRewards(id, -20, 0) + getRewards(id, -20, -10)
+                + getRewards(id, -40, -30),
+            10,
+            "wrong tax total"
+        );
     }
 }
