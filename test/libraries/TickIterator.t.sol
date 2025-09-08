@@ -86,11 +86,11 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(50, 100);
         addLiquidityAtTicks(100, 150);
 
-        // With exclusive bounds, (-100, 100) excludes both -100 and 100
-        // Should get: -50, 0, 50
+        // Start is exclusive (-100 not included), end is inclusive (100 included)
+        // Should get: -50, 0, 50, 100
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
 
-        // Should iterate through initialized ticks (excluding boundaries)
+        // Should iterate through initialized ticks
         assertTrue(iter.hasNext(), "Should have first tick");
         assertEq(iter.getNext(), -50, "First tick should be -50");
 
@@ -99,6 +99,9 @@ contract TickIteratorTest is BaseTest {
 
         assertTrue(iter.hasNext(), "Should have third tick");
         assertEq(iter.getNext(), 50, "Third tick should be 50");
+
+        assertTrue(iter.hasNext(), "Should have fourth tick");
+        assertEq(iter.getNext(), 100, "Fourth tick should be 100");
 
         assertFalse(iter.hasNext(), "Should have no more ticks");
     }
@@ -110,13 +113,16 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
-        // With exclusive bounds, -100 to 100 means (-100, 100)
+        // Start is exclusive (-100 not included), end is inclusive (100 included)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
 
         assertTrue(iter.hasNext());
         assertEq(iter.getNext(), 0, "Should exclude start boundary -100");
 
-        assertFalse(iter.hasNext(), "Should exclude end boundary 100");
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 100, "Should include end boundary 100");
+
+        assertFalse(iter.hasNext());
     }
 
     function test_iterateUp_acrossWords() public {
@@ -178,11 +184,14 @@ contract TickIteratorTest is BaseTest {
 
         // Test iteration over position boundaries with exclusive bounds
         // When adding liquidity from 40 to 60, ticks 40 and 60 are initialized
-        // With exclusive bounds (40, 60), neither boundary should be included
+        // Start is exclusive (40 not included), end is inclusive (60 included)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 40, 60);
 
-        // Should have no ticks as both boundaries are excluded
-        assertFalse(iter.hasNext(), "Should have no ticks with exclusive boundaries");
+        // Should have tick 60 (end boundary is included)
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 60, "Should include end boundary 60");
+
+        assertFalse(iter.hasNext());
 
         // To get the boundary ticks, need to expand range
         TickIteratorUp memory iter2 = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 30, 70);
@@ -345,9 +354,10 @@ contract TickIteratorTest is BaseTest {
     // ============ Edge Cases ============
 
     function test_iterateUp_emptyRange() public view {
-        // Empty range: start == end should have no ticks
+        // When start == end, the range includes just that point
+        // Since no liquidity at tick 100, should have no ticks
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, 100, 100);
-        assertFalse(iter.hasNext(), "Empty range should have no ticks");
+        assertFalse(iter.hasNext(), "No initialized tick at position 100");
     }
 
     function test_iterateDown_emptyRange() public view {
@@ -495,13 +505,16 @@ contract TickIteratorTest is BaseTest {
         addLiquidityAtTicks(0, 100);
         addLiquidityAtTicks(100, 200);
 
-        // With exclusive bounds (-100, 100), should not include -100 or 100
+        // Start is exclusive (-100 not included), end is inclusive (100 included)
         TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, -100, 100);
 
         assertTrue(iter.hasNext());
-        assertEq(iter.getNext(), 0, "Should only get tick 0");
+        assertEq(iter.getNext(), 0, "First tick should be 0");
 
-        assertFalse(iter.hasNext(), "Should not include boundary ticks");
+        assertTrue(iter.hasNext());
+        assertEq(iter.getNext(), 100, "Should include end boundary 100");
+
+        assertFalse(iter.hasNext());
     }
 
     function test_iterateDown_boundaryExclusion() public {

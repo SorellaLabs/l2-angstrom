@@ -12,6 +12,7 @@ import {HookDeployer} from "./HookDeployer.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "src/hook-config.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
+import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 
@@ -37,11 +38,14 @@ contract BaseTest is Test, HookDeployer {
         bytes memory initcode,
         IPoolManager uni,
         address owner,
-        Hooks.Permissions memory requiredPermissions
+        Hooks.Permissions memory requiredPermissions,
+        IFlashBlockNumber flashBlockNumberProvider
     ) internal returns (address addr) {
         bool success;
         (success, addr,) = deployHook(
-            bytes.concat(initcode, abi.encode(uni, owner)), CREATE2_FACTORY, requiredPermissions
+            bytes.concat(initcode, abi.encode(uni, owner, flashBlockNumberProvider)),
+            CREATE2_FACTORY,
+            requiredPermissions
         );
         assertTrue(success);
     }

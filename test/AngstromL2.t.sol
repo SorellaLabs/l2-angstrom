@@ -22,6 +22,7 @@ import {getRequiredHookPermissions, POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/ho
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
 
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
+import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2Test is BaseTest {
@@ -52,7 +53,8 @@ contract AngstromL2Test is BaseTest {
                 type(AngstromL2).creationCode,
                 IPoolManager(address(manager)),
                 address(this),
-                getRequiredHookPermissions()
+                getRequiredHookPermissions(),
+                IFlashBlockNumber(address(0))
             )
         );
     }
@@ -112,7 +114,6 @@ contract AngstromL2Test is BaseTest {
     }
 
     function setupSimpleZeroForOnePositions(PoolKey memory key) internal {
-
         addLiquidity(key, -10, 20, 10e21);
         addLiquidity(key, -20, 0, 2e21);
         addLiquidity(key, -20, -10, 3e21);
@@ -227,7 +228,6 @@ contract AngstromL2Test is BaseTest {
     }
 
     function setupSimpleOneForZeroPositions(PoolKey memory key) internal {
-
         addLiquidity(key, -20, 10, 10e21);
         addLiquidity(key, 0, 20, 2e21);
         addLiquidity(key, 10, 20, 3e21);

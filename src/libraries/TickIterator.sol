@@ -43,7 +43,7 @@ library TickIteratorLib {
     /// @param poolId The ID of the pool to iterate
     /// @param tickSpacing The tick spacing of the pool
     /// @param startTick The starting tick (exclusive)
-    /// @param endTick The ending tick (exclusive)
+    /// @param endTick The ending tick (inclusive)
     /// @return self The initialized iterator
     function initUp(
         IPoolManager manager,
@@ -52,27 +52,23 @@ library TickIteratorLib {
         int24 startTick,
         int24 endTick
     ) internal view returns (TickIteratorUp memory self) {
-        if (!(startTick <= endTick)) revert InvalidRange();
-
         self.manager = manager;
         self.poolId = poolId;
         self.tickSpacing = tickSpacing;
-        self.currentTick = startTick;
         self.endTick = endTick;
 
-        if (startTick == endTick) return self;
-
-        (int16 wordPos,) = TickLib.position(startTick.compress(tickSpacing));
-        self.currentWord = manager.getPoolBitmapInfo(poolId, wordPos);
-
-        _advanceToNextUp(self);
+        self.reset(startTick);
+        return self;
     }
 
     function reset(TickIteratorUp memory self, int24 startTick) internal view {
         if (!(startTick <= self.endTick)) revert InvalidRange();
         self.currentTick = startTick;
 
-        if (startTick == self.endTick) return;
+        if (startTick == self.endTick) {
+            self.currentTick = type(int24).max;
+            return;
+        }
 
         (int16 wordPos,) = TickLib.position(startTick.compress(self.tickSpacing));
         self.currentWord = self.manager.getPoolBitmapInfo(self.poolId, wordPos);
@@ -118,8 +114,8 @@ library TickIteratorLib {
     /// @param manager The pool manager contract
     /// @param poolId The ID of the pool to iterate
     /// @param tickSpacing The tick spacing of the pool
-    /// @param startTick The starting tick (inclusive, should be higher)
-    /// @param endTick The ending tick (inclusive, should be lower)
+    /// @param startTick The starting tick (exclusive, should be higher)
+    /// @param endTick The ending tick (exclusive, should be lower)
     /// @return self The initialized iterator
     function initDown(
         IPoolManager manager,
@@ -128,20 +124,13 @@ library TickIteratorLib {
         int24 startTick,
         int24 endTick
     ) internal view returns (TickIteratorDown memory self) {
-        if (!(endTick <= startTick)) revert InvalidRange();
-
         self.manager = manager;
         self.poolId = poolId;
         self.tickSpacing = tickSpacing;
-        self.currentTick = startTick;
         self.endTick = endTick;
 
-        if (startTick == endTick) return self;
-
-        (int16 wordPos,) = TickLib.position(startTick.compress(tickSpacing));
-        self.currentWord = manager.getPoolBitmapInfo(poolId, wordPos);
-
-        _advanceToNextDown(self);
+        self.reset(startTick);
+        return self;
     }
 
     function reset(TickIteratorDown memory self, int24 startTick) internal view {
