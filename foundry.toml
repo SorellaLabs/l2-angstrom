@@ -13,7 +13,7 @@ show_progress = true
 ignored_error_codes = [
   2394, # Transient storage warning
   3860, # Initcode size too large
-  5574, # Contract size too large
+  2519, # Shadowed variable warning
 ]
 
 remappings = [

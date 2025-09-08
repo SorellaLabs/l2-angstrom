@@ -6,9 +6,6 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {TickLib} from "./TickLib.sol";
 import {IUniV4} from "../interfaces/IUniV4.sol";
 
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-
 struct TickIteratorUp {
     IPoolManager manager;
     PoolId poolId;
@@ -32,8 +29,6 @@ using TickIteratorLib for TickIteratorUp global;
 
 /// @author philogy <https://github.com/philogy>
 library TickIteratorLib {
-    using FormatLib for *;
-
     using TickLib for int24;
     using TickLib for uint256;
     using IUniV4 for IPoolManager;
@@ -58,9 +53,6 @@ library TickIteratorLib {
         int24 endTick
     ) internal view returns (TickIteratorUp memory self) {
         if (!(startTick <= endTick)) revert InvalidRange();
-
-        console.log("startTick: %s", startTick.toStr());
-        console.log("endTick: %s", endTick.toStr());
 
         self.manager = manager;
         self.poolId = poolId;

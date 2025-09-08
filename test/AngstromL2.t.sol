@@ -213,4 +213,147 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
     }
+
+    function test_simpleZeroForOneSwap5() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleZeroForOnePositions(key);
+
+        setPriorityFee(8.2 gwei);
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -10, 20), 0.027749953091107329e18, "wrong rewards for [-10, 20]");
+        assertEq(getRewards(id, -20, 0), 0.007235575329851248e18, "wrong rewards for [-20, 0]");
+        assertEq(getRewards(id, -20, -10), 0.004675024834863845e18, "wrong rewards for [-20, -10]");
+        assertEq(getRewards(id, -40, -30), 0.000519446744177575e18, "wrong rewards for [-40, -30]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(8.2 gwei),
+            getRewards(id, -10, 20) + getRewards(id, -20, 0) + getRewards(id, -20, -10)
+                + getRewards(id, -40, -30),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function setupSimpleOneForZeroPositions(PoolKey memory key) internal {
+        PoolId id = key.toId();
+
+        addLiquidity(key, -20, 10, 10e21);
+        addLiquidity(key, 0, 20, 2e21);
+        addLiquidity(key, 10, 20, 3e21);
+        addLiquidity(key, 30, 40, 0.8e21);
+
+        assertEq(getRewards(id, -20, 10), 0);
+        assertEq(getRewards(id, 0, 20), 0);
+        assertEq(getRewards(id, 10, 20), 0);
+        assertEq(getRewards(id, 30, 40), 0);
+    }
+
+    function test_simpleOneForZeroSwap1() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleOneForZeroPositions(key);
+
+        setPriorityFee(0.7 gwei);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -20, 10), 0.002678335827005454e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(id, 0, 20), 0.000622065968438472e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(id, 10, 20), 0.000129598204556072e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(id, 30, 40), 0, "wrong rewards for [30, 40]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(0.7 gwei),
+            getRewards(id, -20, 10) + getRewards(id, 0, 20) + getRewards(id, 10, 20),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleOneForZeroSwap2() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleOneForZeroPositions(key);
+
+        setPriorityFee(1.3 gwei);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -20, 10), 0.004432088692461249e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(id, 0, 20), 0.001307015166110849e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(id, 10, 20), 0.000630896141427899e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(id, 30, 40), 0, "wrong rewards for [30, 40]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(1.3 gwei),
+            getRewards(id, -20, 10) + getRewards(id, 0, 20) + getRewards(id, 10, 20),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleOneForZeroSwap3() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleOneForZeroPositions(key);
+
+        setPriorityFee(2.6 gwei);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -20, 10), 0.00776359551092331e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(id, 0, 20), 0.002922193256941472e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(id, 10, 20), 0.002054211232135216e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(id, 30, 40), 0, "wrong rewards for [30, 40]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(2.6 gwei),
+            getRewards(id, -20, 10) + getRewards(id, 0, 20) + getRewards(id, 10, 20),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleOneForZeroSwap4() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleOneForZeroPositions(key);
+
+        setPriorityFee(5.4 gwei);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -20, 10), 0.014760006124184324e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(id, 0, 20), 0.006321299553358821e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(id, 10, 20), 0.005053947492782935e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(id, 30, 40), 0.000324746829673917e18, "wrong rewards for [30, 40]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(5.4 gwei),
+            getRewards(id, -20, 10) + getRewards(id, 0, 20) + getRewards(id, 10, 20)
+                + getRewards(id, 30, 40),
+            10,
+            "wrong tax total"
+        );
+    }
+
+    function test_simpleOneForZeroSwap5() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        PoolId id = key.toId();
+
+        setupSimpleOneForZeroPositions(key);
+
+        setPriorityFee(8.2 gwei);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        assertEq(getRewards(id, -20, 10), 0.021718092436443219e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(id, 0, 20), 0.009701786534809838e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(id, 10, 20), 0.008037252071281791e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(id, 30, 40), 0.000722868957465149e18, "wrong rewards for [30, 40]");
+        assertApproxEqAbs(
+            angstrom.getSwapTaxAmount(8.2 gwei),
+            getRewards(id, -20, 10) + getRewards(id, 0, 20) + getRewards(id, 10, 20)
+                + getRewards(id, 30, 40),
+            10,
+            "wrong tax total"
+        );
+    }
 }
