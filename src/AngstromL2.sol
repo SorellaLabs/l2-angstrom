@@ -2,6 +2,7 @@
 pragma solidity =0.8.26;
 
 import {UniConsumer} from "./modules/UniConsumer.sol";
+import {Ownable} from "solady/src/auth/Ownable.sol";
 import {IUniV4, IPoolManager, PoolId} from "./interfaces/IUniV4.sol";
 import {TickIteratorLib, TickIteratorUp, TickIteratorDown} from "./libraries/TickIterator.sol";
 import {
@@ -28,12 +29,12 @@ import {PoolKeyHelperLib} from "./libraries/PoolKeyHelperLib.sol";
 import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
 
-import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2 is
     UniConsumer,
+    Ownable,
     IBeforeSwapHook,
     IAfterSwapHook,
     IAfterAddLiquidityHook,
@@ -52,6 +53,8 @@ contract AngstromL2 is
     using FormatLib for *;
 
     error NegationOverflow();
+
+    event PoolLPFeeUpdated(PoolKey key, uint24 newFee);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -73,17 +76,31 @@ contract AngstromL2 is
     tuint256 internal liquidityBeforeSwap;
     tbytes32 internal slot0BeforeSwapStore;
 
-    constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) {
+    constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) Ownable() {
+        _initializeOwner(owner);
         Hooks.validateHookPermissions(IHooks(address(this)), getRequiredHookPermissions());
     }
 
+    function withdrawProtocolRevenue(address to, uint128 amount) public {
+        _checkOwner();
+        unclaimedProtocolRevenue -= amount;
+        UNI_V4.transfer(to, NATIVE_CURRENCY_ID, amount);
+    }
+
+    function setPoolLPFee(PoolKey calldata key, uint24 newFee) public {
+        _checkOwner();
+        UNI_V4.updateDynamicLPFee(key, newFee);
+        emit PoolLPFeeUpdated(key, newFee);
+    }
+
     function getPendingPositionRewards(
-        PoolId id,
+        PoolKey calldata key,
         address owner,
         int24 lowerTick,
         int24 upperTick,
         bytes32 salt
     ) public view returns (uint256 rewards0) {
+        PoolId id = key.calldataToId();
         rewards0 =
             rewards[id].getPendingPositionRewards(UNI_V4, id, owner, lowerTick, upperTick, salt);
     }
@@ -122,7 +139,7 @@ contract AngstromL2 is
         }
         if (rewardAmount0 > taxAmountInEther) {
             UNI_V4.burn(address(this), NATIVE_CURRENCY_ID, rewardAmount0 - taxAmountInEther);
-        } else {
+        } else if (rewardAmount0 < taxAmountInEther) {
             UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, taxAmountInEther - rewardAmount0);
         }
         return (
@@ -144,7 +161,7 @@ contract AngstromL2 is
 
         uint256 etherAmount = _getSwapTaxAmount();
         if (etherAmount == 0 || _getBlock() == blockOfLastTopOfBlock) {
-            return (this.beforeSwap.selector, BeforeSwapDelta.wrap(0), 0);
+            return (this.beforeSwap.selector, toBeforeSwapDelta(0, 0), 0);
         }
 
         int128 etherDelta = etherAmount.toInt256().toInt128();
@@ -361,6 +378,9 @@ contract AngstromL2 is
     }
 
     function _getJitTaxAmount() internal view returns (uint256) {
+        if (_getBlock() == blockOfLastTopOfBlock) {
+            return 0;
+        }
         uint256 priorityFee = tx.gasprice - block.basefee;
         return getJitTaxAmount(priorityFee);
     }

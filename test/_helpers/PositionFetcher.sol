@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 // force compile for backend
-import {PositionManager} from "v4-periphery/src/PositionManager.sol";
 import {PositionInfo} from "v4-periphery/src/libraries/PositionInfoLibrary.sol";
 
 struct Position {
