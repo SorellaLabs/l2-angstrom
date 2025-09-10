@@ -34,20 +34,19 @@ contract BaseTest is Test, HookDeployer {
         return IPoolManager(addr);
     }
 
-    function deployAngstromL2(
+    function mineAngstromL2Salt(
+        address factory,
         bytes memory initcode,
-        IPoolManager uni,
+        IPoolManager uniV4,
+        IFlashBlockNumber flashBlockNumberProvider,
         address owner,
-        Hooks.Permissions memory requiredPermissions,
-        IFlashBlockNumber flashBlockNumberProvider
-    ) internal returns (address addr) {
-        bool success;
-        (success, addr,) = deployHook(
-            bytes.concat(initcode, abi.encode(uni, owner, flashBlockNumberProvider)),
-            CREATE2_FACTORY,
+        Hooks.Permissions memory requiredPermissions
+    ) internal view returns (bytes32 salt) {
+        (, salt) = mineAngstromL2Salt(
+            bytes.concat(initcode, abi.encode(uniV4, flashBlockNumberProvider, owner)),
+            factory,
             requiredPermissions
         );
-        assertTrue(success);
     }
 
     function poolKey(address hook, address token, int24 tickSpacing)

@@ -17,6 +17,7 @@ import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {Slot0} from "v4-core/src/types/Slot0.sol";
 
+import {AngstromL2Factory} from "../src/AngstromL2Factory.sol";
 import {AngstromL2} from "../src/AngstromL2.sol";
 import {getRequiredHookPermissions, POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
@@ -28,12 +29,16 @@ import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
 contract AngstromL2Test is BaseTest {
     using FormatLib for *;
     using PoolIdLibrary for PoolKey;
+
     using IUniV4 for UniV4Inspector;
     using TickMath for int24;
 
     UniV4Inspector manager;
     RouterActor router;
+    AngstromL2Factory factory;
     AngstromL2 angstrom;
+    address factoryOwner = makeAddr("factory_owner");
+    address hookOwner = makeAddr("hook_owner");
 
     MockERC20 token;
 
@@ -48,15 +53,18 @@ contract AngstromL2Test is BaseTest {
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
 
-        angstrom = AngstromL2(
-            deployAngstromL2(
-                type(AngstromL2).creationCode,
-                IPoolManager(address(manager)),
-                address(this),
-                getRequiredHookPermissions(),
-                IFlashBlockNumber(address(0))
-            )
+        factory = new AngstromL2Factory(factoryOwner, manager, IFlashBlockNumber(address(0)));
+
+        bytes32 salt = mineAngstromL2Salt(
+            address(factory),
+            type(AngstromL2).creationCode,
+            manager,
+            IFlashBlockNumber(address(0)),
+            hookOwner,
+            getRequiredHookPermissions()
         );
+
+        angstrom = AngstromL2(payable(factory.deployAngstromL2(hookOwner, salt)));
     }
 
     function initializePool(address asset1, int24 tickSpacing, int24 startTick)
@@ -73,7 +81,8 @@ contract AngstromL2Test is BaseTest {
             hooks: IHooks(address(angstrom))
         });
 
-        manager.initialize(key, TickMath.getSqrtPriceAtTick(startTick));
+        vm.prank(hookOwner);
+        angstrom.initializeNewPool(key, TickMath.getSqrtPriceAtTick(startTick), 0, 0);
 
         return key;
     }

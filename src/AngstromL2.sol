@@ -3,6 +3,7 @@ pragma solidity =0.8.26;
 
 import {UniConsumer} from "./modules/UniConsumer.sol";
 import {Ownable} from "solady/src/auth/Ownable.sol";
+import {IAngstromL2Hook} from "./interfaces/IAngstromL2Hook.sol";
 import {IUniV4, IPoolManager, PoolId} from "./interfaces/IUniV4.sol";
 import {TickIteratorLib, TickIteratorUp, TickIteratorDown} from "./libraries/TickIterator.sol";
 import {
@@ -14,12 +15,14 @@ import {
     IBeforeInitializeHook
 } from "./interfaces/IHooks.sol";
 import {IFlashBlockNumber} from "./interfaces/IFlashBlockNumber.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {BalanceDelta, toBalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 import {Slot0} from "v4-core/src/types/Slot0.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 import {SqrtPriceMath} from "v4-core/src/libraries/SqrtPriceMath.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
@@ -39,7 +42,8 @@ contract AngstromL2 is
     IBeforeSwapHook,
     IAfterSwapHook,
     IAfterAddLiquidityHook,
-    IAfterRemoveLiquidityHook
+    IAfterRemoveLiquidityHook,
+    IAngstromL2Hook
 {
     using IUniV4 for IPoolManager;
     using PoolKeyHelperLib for PoolKey;
@@ -51,11 +55,13 @@ contract AngstromL2 is
 
     error NegationOverflow();
     error ProtocolFeeExceedsMaximum();
+    error CreatorFeeExceedsMaximum();
     error AttemptingToWithdrawLPRewards();
     error IncompatiblePoolConfiguration();
+    error PoolNotInitialized();
+    error PoolAlreadyInitialized();
 
-    event PoolLPFeeUpdated(PoolKey key, uint24 newFee);
-    event PoolHookSwapFeeUpdated(PoolKey key, uint256 newFeeE6);
+    event PoolFeeConfigurationUpdated(PoolKey key, PoolFeeConfiguration configuration);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -69,54 +75,72 @@ contract AngstromL2 is
     uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 4;
 
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
+    Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
     uint256 internal constant FACTOR_E6 = 1e6;
-    uint256 internal constant MAX_PROTOCOL_FEE_E6 = 0.1e6;
+    uint256 internal constant MAX_PROTOCOL_FEE_E6 = 0.05e6;
+    uint256 internal constant MAX_CREATOR_FEE_E6 = 0.2e6;
 
-    IFlashBlockNumber public immutable FLASH_BLOCK_NUMBER_PROVIDER;
+    IFlashBlockNumber internal immutable FLASH_BLOCK_NUMBER_PROVIDER;
+    address public immutable FACTORY;
 
-    /// @dev Tracks how much of the ether held by the contract is unclaimed revenue vs. unclaimed
-    /// LP rewards.
-    uint128 public unclaimedProtocolRevenueInEther;
     uint128 internal _blockOfLastTopOfBlock;
     mapping(PoolId id => PoolRewards) internal rewards;
-    mapping(PoolId id => uint256) internal _hookSwapFeeE6;
+
+    struct PoolFeeConfiguration {
+        bool isInitialized;
+        uint24 creatorTaxFeeE6;
+        uint24 protocolTaxFeeE6;
+        uint24 creatorSwapFeeE6;
+        uint24 protocolSwapFeeE6;
+    }
+
+    mapping(PoolId id => PoolFeeConfiguration) internal _poolFeeConfiguration;
 
     tuint256 internal liquidityBeforeSwap;
     tbytes32 internal slot0BeforeSwapStore;
 
-    constructor(IPoolManager uniV4, address owner, IFlashBlockNumber flashBlockNumberProvider)
-        UniConsumer(uniV4)
-        Ownable()
+    // Ownable explicit constructor commented out because of weird foundry bug causing
+    // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
+    constructor(IPoolManager uniV4, IFlashBlockNumber flashBlockNumberProvider, address owner)
+        UniConsumer(uniV4) /* Ownable() */
     {
         _initializeOwner(owner);
+        FACTORY = msg.sender;
         Hooks.validateHookPermissions(IHooks(address(this)), getRequiredHookPermissions());
         FLASH_BLOCK_NUMBER_PROVIDER = flashBlockNumberProvider;
     }
 
-    function withdrawProtocolRevenue(uint160 assetId, address to, uint256 amount) public {
+    receive() external payable {}
+
+    function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
-
-        if (assetId == NATIVE_CURRENCY_ID) {
-            if (!(amount <= unclaimedProtocolRevenueInEther)) {
-                revert AttemptingToWithdrawLPRewards();
-            }
-            unclaimedProtocolRevenueInEther -= amount.toUint128();
-        }
-
-        UNI_V4.transfer(to, assetId, amount);
+        currency.transfer(to, amount);
     }
 
-    function setPoolLPFee(PoolKey calldata key, uint24 newFee) public {
-        _checkOwner();
-        UNI_V4.updateDynamicLPFee(key, newFee);
-        emit PoolLPFeeUpdated(key, newFee);
-    }
-
-    function setPoolHookSwapFee(PoolKey calldata key, uint256 newFeeE6) public {
-        _checkOwner();
+    function setProtocolSwapFee(PoolKey calldata key, uint256 newFeeE6) public {
+        _checkCallerIsFactory();
         if (!(newFeeE6 <= MAX_PROTOCOL_FEE_E6)) revert ProtocolFeeExceedsMaximum();
-        _hookSwapFeeE6[key.calldataToId()] = newFeeE6;
-        emit PoolHookSwapFeeUpdated(key, newFeeE6);
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
+        if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
+        feeConfiguration.protocolSwapFeeE6 = newFeeE6.toUint24();
+        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
+    }
+
+    function setProtocolTaxFee(PoolKey calldata key, uint256 newFeeE6) public {
+        _checkCallerIsFactory();
+        if (!(newFeeE6 <= MAX_PROTOCOL_FEE_E6)) revert ProtocolFeeExceedsMaximum();
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
+        if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
+        feeConfiguration.protocolTaxFeeE6 = newFeeE6.toUint24();
+        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
+    }
+
+    function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
+        return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
+    }
+
+    function getJitTaxAmount(uint256 priorityFee) public pure returns (uint256) {
+        return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
     }
 
     function getPendingPositionRewards(
@@ -131,14 +155,41 @@ contract AngstromL2 is
             rewards[id].getPendingPositionRewards(UNI_V4, id, owner, lowerTick, upperTick, salt);
     }
 
-    function beforeInitialize(address, PoolKey calldata key, uint160)
+    function getPoolFeeConfiguration(PoolKey calldata key)
+        public
+        view
+        returns (PoolFeeConfiguration memory)
+    {
+        return _poolFeeConfiguration[key.calldataToId()];
+    }
+
+    function initializeNewPool(
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        uint24 creatorSwapFeeE6,
+        uint24 creatorTaxFeeE6
+    ) public {
+        if (!(msg.sender == owner() || msg.sender == FACTORY)) revert Unauthorized();
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
+        if (feeConfiguration.isInitialized) revert PoolAlreadyInitialized();
+        if (!(creatorSwapFeeE6 <= MAX_CREATOR_FEE_E6)) revert CreatorFeeExceedsMaximum();
+        if (!(creatorTaxFeeE6 <= MAX_CREATOR_FEE_E6)) revert CreatorFeeExceedsMaximum();
+        feeConfiguration.isInitialized = true;
+        UNI_V4.initialize(key, sqrtPriceX96);
+        feeConfiguration.creatorSwapFeeE6 = creatorSwapFeeE6.toUint24();
+        feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
+        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
+    }
+
+    function beforeInitialize(address sender, PoolKey calldata key, uint160)
         external
         view
         returns (bytes4)
     {
         _onlyUniV4();
+        if (sender != address(this)) revert Unauthorized();
         if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
-        if (!LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
+        if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
         return this.beforeInitialize.selector;
     }
 
@@ -156,8 +207,8 @@ contract AngstromL2 is
         rewards[id].updateAfterLiquidityAdd(UNI_V4, id, key.tickSpacing, sender, params);
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
-            UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, taxAmountInEther);
-            unclaimedProtocolRevenueInEther += taxAmountInEther.toUint128();
+            // Protocol collects 100% of the JIT MEV tax
+            UNI_V4.take(CurrencyLibrary.fromId(NATIVE_CURRENCY_ID), FACTORY, taxAmountInEther);
         }
         return (this.afterAddLiquidity.selector, toBalanceDelta(taxAmountInEther.toInt128(), 0));
     }
@@ -176,12 +227,11 @@ contract AngstromL2 is
         uint256 rewardAmount0 = rewards[id].updateAfterLiquidityRemove(UNI_V4, id, sender, params);
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
-            unclaimedProtocolRevenueInEther += taxAmountInEther.toUint128();
+            // Protocol collects 100% of the JIT MEV tax
+            UNI_V4.take(CurrencyLibrary.fromId(NATIVE_CURRENCY_ID), FACTORY, taxAmountInEther);
         }
-        if (rewardAmount0 > taxAmountInEther) {
-            UNI_V4.burn(address(this), NATIVE_CURRENCY_ID, rewardAmount0 - taxAmountInEther);
-        } else if (rewardAmount0 < taxAmountInEther) {
-            UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, taxAmountInEther - rewardAmount0);
+        if (rewardAmount0 > 0) {
+            UNI_V4.burn(address(this), NATIVE_CURRENCY_ID, rewardAmount0);
         }
         return (
             this.afterRemoveLiquidity.selector,
@@ -204,12 +254,9 @@ contract AngstromL2 is
         }
 
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
-        uint256 etherAmount = _getSwapTaxAmount();
-        int128 etherDelta = etherAmount.toInt128();
+        int128 etherDelta = _getSwapTaxAmount().toInt128();
 
-        // ETH aka asset 0 was specified.
         bool etherWasSpecified = params.zeroForOne == params.amountSpecified < 0;
-
         return (
             this.beforeSwap.selector,
             etherWasSpecified ? toBeforeSwapDelta(etherDelta, 0) : toBeforeSwapDelta(0, etherDelta),
@@ -227,25 +274,32 @@ contract AngstromL2 is
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
-        uint256 taxInEther = _getSwapTaxAmount();
-        hookDeltaUnspecified =
-            _computeAndCollectProtocolSwapFee(key, id, params, swapDelta, taxInEther);
+        uint128 blockNumber = _getBlock();
+        bool isTopOfBlock = blockNumber != _blockOfLastTopOfBlock;
+        (uint256 feeInUnspecified, uint256 lpCompensationAmount) = _computeAndCollectProtocolSwapFee(
+            key, id, params, swapDelta, isTopOfBlock ? _getSwapTaxAmount() : 0
+        );
+        hookDeltaUnspecified = feeInUnspecified.toInt128();
 
+        PoolKey calldata key_ = key;
         Slot0 slot0BeforeSwap = Slot0.wrap(slot0BeforeSwapStore.get());
         Slot0 slot0AfterSwap = UNI_V4.getSlot0(id);
         rewards[id].updateAfterTickMove(
-            id, UNI_V4, slot0BeforeSwap.tick(), slot0AfterSwap.tick(), key.tickSpacing
+            id, UNI_V4, slot0BeforeSwap.tick(), slot0AfterSwap.tick(), key_.tickSpacing
         );
 
-        uint128 blockNumber = _getBlock();
-        if (taxInEther == 0 || blockNumber == _blockOfLastTopOfBlock) {
+        if (!isTopOfBlock || lpCompensationAmount == 0) {
             return (this.afterSwap.selector, hookDeltaUnspecified);
         }
         _blockOfLastTopOfBlock = blockNumber;
 
         params.zeroForOne
-            ? _zeroForOneDistributeTax(id, key.tickSpacing, slot0BeforeSwap, slot0AfterSwap)
-            : _oneForZeroDistributeTax(id, key.tickSpacing, slot0BeforeSwap, slot0AfterSwap);
+            ? _zeroForOneDistributeTax(
+                id, key_.tickSpacing, slot0BeforeSwap, slot0AfterSwap, lpCompensationAmount
+            )
+            : _oneForZeroDistributeTax(
+                id, key_.tickSpacing, slot0BeforeSwap, slot0AfterSwap, lpCompensationAmount
+            );
 
         return (this.afterSwap.selector, hookDeltaUnspecified);
     }
@@ -255,27 +309,57 @@ contract AngstromL2 is
         PoolId id,
         SwapParams calldata params,
         BalanceDelta swapDelta,
-        uint256 taxInEther
-    ) internal returns (int128 fee128) {
-        uint256 protocolFeeE6 = _hookSwapFeeE6[id];
+        uint256 totalTaxInEther
+    ) internal returns (uint256 fee, uint256 lpCompensationAmountInEther) {
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
+        uint256 totalSwapFeeRateE6 =
+            feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
+
+        // Compute the total swap fee amount
         bool exactIn = params.amountSpecified < 0;
+        uint256 creatorSwapFeeAmount;
+        uint256 protocolSwapFeeAmount;
+        if (totalSwapFeeRateE6 != 0) {
+            int128 unspecifiedDelta =
+                exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
+            uint256 absTargetAmount = unspecifiedDelta.abs();
+            fee = exactIn
+                ? absTargetAmount * totalSwapFeeRateE6 / FACTOR_E6
+                : absTargetAmount * FACTOR_E6 / (FACTOR_E6 - totalSwapFeeRateE6) - absTargetAmount;
 
-        int128 targetAmount =
-            exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
-        uint256 absTargetAmount = targetAmount.abs();
-        uint256 fee = exactIn
-            ? absTargetAmount * protocolFeeE6 / FACTOR_E6
-            : absTargetAmount * FACTOR_E6 / (FACTOR_E6 - protocolFeeE6) - absTargetAmount;
-        fee128 = fee.toInt128();
-
-        uint256 feeCurrencyId =
-            (exactIn != params.zeroForOne ? key.currency0 : key.currency1).toId();
-        if (feeCurrencyId == NATIVE_CURRENCY_ID) {
-            unclaimedProtocolRevenueInEther += fee.toUint128();
-            UNI_V4.mint(address(this), feeCurrencyId, fee + taxInEther);
+            // Determine protocol/creator split
+            creatorSwapFeeAmount = fee * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6;
+            protocolSwapFeeAmount = fee - creatorSwapFeeAmount;
         } else {
-            UNI_V4.mint(address(this), feeCurrencyId, fee);
-            UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, taxInEther);
+            creatorSwapFeeAmount = 0;
+            protocolSwapFeeAmount = 0;
+        }
+        Currency feeCurrency = exactIn != params.zeroForOne ? key.currency0 : key.currency1;
+
+        if (totalTaxInEther == 0) {
+            UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
+            UNI_V4.take(feeCurrency, FACTORY, protocolSwapFeeAmount);
+            return (fee, 0);
+        }
+
+        uint256 creatorTaxShareInEther =
+            totalTaxInEther * feeConfiguration.creatorTaxFeeE6 / FACTOR_E6;
+        uint256 protocolTaxShareInEther =
+            totalTaxInEther * feeConfiguration.protocolTaxFeeE6 / FACTOR_E6;
+        lpCompensationAmountInEther =
+            totalTaxInEther - creatorTaxShareInEther - protocolTaxShareInEther;
+        UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, lpCompensationAmountInEther);
+
+        if (feeCurrency == NATIVE_CURRENCY) {
+            UNI_V4.take(
+                NATIVE_CURRENCY, address(this), creatorSwapFeeAmount + creatorTaxShareInEther
+            );
+            UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolSwapFeeAmount + protocolTaxShareInEther);
+        } else {
+            UNI_V4.take(NATIVE_CURRENCY, address(this), creatorTaxShareInEther);
+            UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolTaxShareInEther);
+            UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
+            UNI_V4.take(feeCurrency, FACTORY, protocolSwapFeeAmount);
         }
     }
 
@@ -283,21 +367,26 @@ contract AngstromL2 is
         PoolId id,
         int24 tickSpacing,
         Slot0 slot0BeforeSwap,
-        Slot0 slot0AfterSwap
+        Slot0 slot0AfterSwap,
+        uint256 lpCompensationAmount
     ) internal {
         TickIteratorDown memory ticks = TickIteratorLib.initDown(
             UNI_V4, id, tickSpacing, slot0BeforeSwap.tick(), slot0AfterSwap.tick()
         );
 
-        uint256 taxInEther = _getSwapTaxAmount();
         uint128 liquidity = liquidityBeforeSwap.get().toUint128();
         (int24 lastTick, uint160 pstarSqrtX96) = CompensationPriceFinder.getZeroForOne(
-            ticks, liquidity, taxInEther, slot0BeforeSwap.sqrtPriceX96(), slot0AfterSwap
+            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap.sqrtPriceX96(), slot0AfterSwap
         );
 
         ticks.reset(slot0BeforeSwap.tick());
         _zeroForOneCreditRewards(
-            ticks, liquidity, taxInEther, slot0BeforeSwap.sqrtPriceX96(), lastTick, pstarSqrtX96
+            ticks,
+            liquidity,
+            lpCompensationAmount,
+            slot0BeforeSwap.sqrtPriceX96(),
+            lastTick,
+            pstarSqrtX96
         );
     }
 
@@ -305,28 +394,33 @@ contract AngstromL2 is
         PoolId id,
         int24 tickSpacing,
         Slot0 slot0BeforeSwap,
-        Slot0 slot0AfterSwap
+        Slot0 slot0AfterSwap,
+        uint256 lpCompensationAmount
     ) internal {
         TickIteratorUp memory ticks = TickIteratorLib.initUp(
             UNI_V4, id, tickSpacing, slot0BeforeSwap.tick(), slot0AfterSwap.tick()
         );
 
-        uint256 taxInEther = _getSwapTaxAmount();
         uint128 liquidity = liquidityBeforeSwap.get().toUint128();
         (int24 lastTick, uint160 pstarSqrtX96) = CompensationPriceFinder.getOneForZero(
-            ticks, liquidity, taxInEther, slot0BeforeSwap, slot0AfterSwap
+            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap, slot0AfterSwap
         );
 
         ticks.reset(slot0BeforeSwap.tick());
         _oneForZeroCreditRewards(
-            ticks, liquidity, taxInEther, slot0BeforeSwap.sqrtPriceX96(), lastTick, pstarSqrtX96
+            ticks,
+            liquidity,
+            lpCompensationAmount,
+            slot0BeforeSwap.sqrtPriceX96(),
+            lastTick,
+            pstarSqrtX96
         );
     }
 
     function _zeroForOneCreditRewards(
         TickIteratorDown memory ticks,
         uint128 liquidity,
-        uint256 taxInEther,
+        uint256 lpCompensationAmount,
         uint160 priceUpperSqrtX96,
         int24 lastTick,
         uint160 pstarSqrtX96
@@ -348,10 +442,10 @@ contract AngstromL2 is
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
-                rangeReward = (delta1.divX96(pstarX96) - delta0).min(taxInEther);
+                rangeReward = (delta1.divX96(pstarX96) - delta0).min(lpCompensationAmount);
 
                 unchecked {
-                    taxInEther -= rangeReward;
+                    lpCompensationAmount -= rangeReward;
                     cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(rangeReward, liquidity);
                 }
             }
@@ -368,7 +462,7 @@ contract AngstromL2 is
 
         // Distribute remainder to last range and update global accumulator.
         unchecked {
-            cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(taxInEther, liquidity);
+            cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
     }
@@ -376,7 +470,7 @@ contract AngstromL2 is
     function _oneForZeroCreditRewards(
         TickIteratorUp memory ticks,
         uint128 liquidity,
-        uint256 taxInEther,
+        uint256 lpCompensationAmount,
         uint160 priceLowerSqrtX96,
         int24 lastTick,
         uint160 pstarSqrtX96
@@ -398,10 +492,10 @@ contract AngstromL2 is
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
-                rangeReward = (delta0 - delta1.divX96(pstarX96)).min(taxInEther);
+                rangeReward = (delta0 - delta1.divX96(pstarX96)).min(lpCompensationAmount);
 
                 unchecked {
-                    taxInEther -= rangeReward;
+                    lpCompensationAmount -= rangeReward;
                     cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(rangeReward, liquidity);
                 }
             }
@@ -418,7 +512,7 @@ contract AngstromL2 is
 
         // Distribute remainder to last range and update global accumulator.
         unchecked {
-            cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(taxInEther, liquidity);
+            cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
     }
@@ -438,14 +532,6 @@ contract AngstromL2 is
         return uint128(FLASH_BLOCK_NUMBER_PROVIDER.getFlashblockNumber());
     }
 
-    function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
-        return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
-    }
-
-    function getJitTaxAmount(uint256 priorityFee) public pure returns (uint256) {
-        return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
-    }
-
     function _getSwapTaxAmount() internal view returns (uint256) {
         uint256 priorityFee = tx.gasprice - block.basefee;
         return getSwapTaxAmount(priorityFee);
@@ -457,5 +543,9 @@ contract AngstromL2 is
         }
         uint256 priorityFee = tx.gasprice - block.basefee;
         return getJitTaxAmount(priorityFee);
+    }
+
+    function _checkCallerIsFactory() internal view {
+        if (msg.sender != FACTORY) revert Unauthorized();
     }
 }

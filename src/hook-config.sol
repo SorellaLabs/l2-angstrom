@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 
-bool constant POOLS_MUST_HAVE_DYNAMIC_FEE = true;
+bool constant POOLS_MUST_HAVE_DYNAMIC_FEE = false;
 
 function getRequiredHookPermissions() pure returns (Hooks.Permissions memory permissions) {
     permissions.beforeInitialize = true; // To constrain that this is an ETH pool

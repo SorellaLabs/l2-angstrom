@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
+import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 abstract contract HookDeployer is Test {
@@ -18,11 +19,11 @@ abstract contract HookDeployer is Test {
         bytes32 initcodeHash;
     }
 
-    function deployHook(
+    function mineAngstromL2Salt(
         bytes memory initcode,
         address factory,
         Hooks.Permissions memory requiredPermissions
-    ) internal returns (bool success, address addr, bytes memory retdata) {
+    ) internal view returns (address addr, bytes32 salt) {
         Create2Params memory params = Create2Params(
             (uint256(0xff) << 160) | uint256(uint160(factory)), 0, keccak256(initcode)
         );
@@ -34,15 +35,25 @@ abstract contract HookDeployer is Test {
             }
 
             if (validateHookPermissions(addr, requiredPermissions)) {
-                break;
+                console.log("params.salt: %s", params.salt);
+                return (addr, bytes32(params.salt));
             }
 
             unchecked {
                 params.salt++;
             }
         }
+    }
 
-        (success, retdata) = factory.call(abi.encodePacked(params.salt, initcode));
+    function deployHook(
+        bytes memory initcode,
+        address factory,
+        Hooks.Permissions memory requiredPermissions
+    ) internal returns (bool success, address addr, bytes memory retdata) {
+        bytes32 salt;
+        (addr, salt) = mineAngstromL2Salt(initcode, factory, requiredPermissions);
+
+        (success, retdata) = factory.call(abi.encodePacked(salt, initcode));
         if (success) {
             assertEq(
                 retdata,
