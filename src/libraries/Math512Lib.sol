@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {LibBit} from "solady/src/utils/LibBit.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 library Math512Lib {
@@ -72,16 +73,34 @@ library Math512Lib {
         if (x1 == 0) {
             return FixedPointMathLib.sqrt(x0);
         }
-        root = 1 << (128 + (LibBit.fls(x1) / 2));
+
+        unchecked {
+            // There are two edge cases where intermediate guess values will cause the
+            // `[x1 x0] / guess` division to result in a value larger than 256 bits. Specifically:
+            // sqrt([2^256-1, _]) => 2^256-1
+            // sqrt([2^256-2, 0]) => 2^256-2
+            // We can handle these explicitly to ensure the remaining logic can use the invariant that
+            // `[x1 x0] / guess` fits within 256 bits. For all `x in range([2^256-2, 1], MAX_UINT512)
+            // sqrt(x) => 2^256-1; x = [2^256-2, 0] sqrt(x) => 2^256-2`.
+            if (x1 + 2 < 2) {
+                assembly {
+                    root := or(x1, gt(x0, 0))
+                }
+                return root;
+            }
+            root = 1 << (129 + (LibBit.fls(x1) >> 1));
+            root -= 1;
+        }
         uint256 last;
         do {
             last = root;
-            // Because `floor(sqrt(UINT512_MAX)) = 2^256-1` and guesses converging towards the
-            // correct result the result of all divisions is guaranteed to fit within 256 bits.
+            // The above invariant lets us safely discard the upper bits of the result. This is
+            // because our guess always starts at or above the correct result and monotonically
+            //1 decreases towards the correct result.
             (, root) = div512by256(x1, x0, root);
-            root = (root + last) / 2;
-        } while (root != last);
-        return root;
+            root = FixedPointMathLib.avg(root, last);
+        } while (root < last);
+        return last;
     }
 
     /// @dev Computes `[x1 x0] / d`
@@ -100,8 +119,9 @@ library Math512Lib {
             // 256 division" logic from Solady's `fullMulDiv` (Credit under MIT license:
             // https://github.com/Vectorized/solady/blob/main/src/utils/FixedPointMathLib.sol)
 
-            // We need to compute `[r1 x0] mod d = r1 * 2^256 + x0 = (r1 * 2^128) * 2^128 + x0`.
-            let r := addmod(mulmod(shl(128, x1), shl(128, 1), d), x0, d)
+            // We need to compute `[r1 x0] mod d = r1 * 2^256 + x0 = r1 * (2^256 - 1 + 1) + x0 =
+            // r1 * (2^256 - 1) + r1 + x0`.
+            let r := addmod(addmod(mulmod(r1, not(0), d), r1, d), x0, d)
 
             // Same math from Solady, reference `fullMulDiv` for explanation.
             let t := and(d, sub(0, d))
