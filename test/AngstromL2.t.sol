@@ -136,6 +136,14 @@ contract AngstromL2Test is BaseTest {
         assertEq(getRewards(key, -40, -30), 0);
     }
 
+    function test_factoryGetDefaultProtocolSwapFee() public {
+        vm.prank(factoryOwner);
+        factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
+
+        assertEq(factory.getDefaultProtocolSwapFee(0.001e6, 0.003e6), 0.001331e6);
+        assertEq(factory.getDefaultProtocolSwapFee(0.0002e6, 0.00004e6), 0.000079e6);
+    }
+
     function test_simpleZeroForOneSwap1() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
 
