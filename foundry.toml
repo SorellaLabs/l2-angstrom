@@ -33,6 +33,7 @@ exclude_lints = [
   "incorrect-shift",
   "screaming-snake-case-immutable",
   "erc20-unchecked-transfer",
+  "unsafe-cheatcode",
 ]
 
 [profile.default.fmt]

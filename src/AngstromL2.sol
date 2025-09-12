@@ -39,6 +39,7 @@ import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
 contract AngstromL2 is
     UniConsumer,
     Ownable,
+    IBeforeInitializeHook,
     IBeforeSwapHook,
     IAfterSwapHook,
     IAfterAddLiquidityHook,
@@ -54,14 +55,11 @@ contract AngstromL2 is
     using SafeCastLib for *;
 
     error NegationOverflow();
-    error ProtocolFeeExceedsMaximum();
     error CreatorFeeExceedsMaximum();
     error AttemptingToWithdrawLPRewards();
     error IncompatiblePoolConfiguration();
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
-
-    event PoolFeeConfigurationUpdated(PoolKey key, PoolFeeConfiguration configuration);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -77,13 +75,14 @@ contract AngstromL2 is
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
     uint256 internal constant FACTOR_E6 = 1e6;
-    uint256 internal constant MAX_PROTOCOL_FEE_E6 = 0.05e6;
-    uint256 internal constant MAX_CREATOR_FEE_E6 = 0.2e6;
+    uint256 internal constant MAX_CREATOR_SWAP_FEE_E6 = 0.2e6;
+    uint256 internal constant MAX_CREATOR_TAX_FEE_E6 = 0.5e6; // 50%
 
-    IFlashBlockNumber internal immutable FLASH_BLOCK_NUMBER_PROVIDER;
+    // TODO: Be able to set provider.
     address public immutable FACTORY;
 
-    uint128 internal _blockOfLastTopOfBlock;
+    IFlashBlockNumber internal flashBlockNumberProvider;
+    uint96 internal _blockOfLastTopOfBlock;
     mapping(PoolId id => PoolRewards) internal rewards;
 
     struct PoolFeeConfiguration {
@@ -101,16 +100,22 @@ contract AngstromL2 is
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
-    constructor(IPoolManager uniV4, IFlashBlockNumber flashBlockNumberProvider, address owner)
-        UniConsumer(uniV4) /* Ownable() */
-    {
+    constructor(
+        IPoolManager uniV4,
+        IFlashBlockNumber initialFlashBlockNumberProvider,
+        address owner
+    ) UniConsumer(uniV4) /* Ownable() */ {
         _initializeOwner(owner);
         FACTORY = msg.sender;
         Hooks.validateHookPermissions(IHooks(address(this)), getRequiredHookPermissions());
-        FLASH_BLOCK_NUMBER_PROVIDER = flashBlockNumberProvider;
+        flashBlockNumberProvider = initialFlashBlockNumberProvider;
     }
 
     receive() external payable {}
+
+    function syncFlashBlockNumberProvider() public {
+        flashBlockNumberProvider = IFactory(FACTORY).flashBlockNumberProvider();
+    }
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
@@ -119,20 +124,16 @@ contract AngstromL2 is
 
     function setProtocolSwapFee(PoolKey calldata key, uint256 newFeeE6) public {
         _checkCallerIsFactory();
-        if (!(newFeeE6 <= MAX_PROTOCOL_FEE_E6)) revert ProtocolFeeExceedsMaximum();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
         feeConfiguration.protocolSwapFeeE6 = newFeeE6.toUint24();
-        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
     }
 
     function setProtocolTaxFee(PoolKey calldata key, uint256 newFeeE6) public {
         _checkCallerIsFactory();
-        if (!(newFeeE6 <= MAX_PROTOCOL_FEE_E6)) revert ProtocolFeeExceedsMaximum();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
         feeConfiguration.protocolTaxFeeE6 = newFeeE6.toUint24();
-        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
     }
 
     function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
@@ -172,13 +173,14 @@ contract AngstromL2 is
         if (!(msg.sender == owner() || msg.sender == FACTORY)) revert Unauthorized();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (feeConfiguration.isInitialized) revert PoolAlreadyInitialized();
-        if (!(creatorSwapFeeE6 <= MAX_CREATOR_FEE_E6)) revert CreatorFeeExceedsMaximum();
-        if (!(creatorTaxFeeE6 <= MAX_CREATOR_FEE_E6)) revert CreatorFeeExceedsMaximum();
+        if (!(creatorSwapFeeE6 <= MAX_CREATOR_SWAP_FEE_E6)) revert CreatorFeeExceedsMaximum();
+        if (!(creatorTaxFeeE6 <= MAX_CREATOR_TAX_FEE_E6)) revert CreatorFeeExceedsMaximum();
         feeConfiguration.isInitialized = true;
         UNI_V4.initialize(key, sqrtPriceX96);
         feeConfiguration.creatorSwapFeeE6 = creatorSwapFeeE6.toUint24();
         feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
-        emit PoolFeeConfigurationUpdated(key, feeConfiguration);
+        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) = IFactory(FACTORY)
+            .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
     }
 
     function beforeInitialize(address sender, PoolKey calldata key, uint160)
@@ -274,7 +276,7 @@ contract AngstromL2 is
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
-        uint128 blockNumber = _getBlock();
+        uint96 blockNumber = _getBlock();
         bool isTopOfBlock = blockNumber != _blockOfLastTopOfBlock;
         (uint256 feeInUnspecified, uint256 lpCompensationAmount) = _computeAndCollectProtocolSwapFee(
             key, id, params, swapDelta, isTopOfBlock ? _getSwapTaxAmount() : 0
@@ -317,8 +319,8 @@ contract AngstromL2 is
 
         // Compute the total swap fee amount
         bool exactIn = params.amountSpecified < 0;
-        uint256 creatorSwapFeeAmount;
-        uint256 protocolSwapFeeAmount;
+        uint256 creatorSwapFeeAmount = 0;
+        uint256 protocolSwapFeeAmount = 0;
         if (totalSwapFeeRateE6 != 0) {
             int128 unspecifiedDelta =
                 exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
@@ -330,9 +332,6 @@ contract AngstromL2 is
             // Determine protocol/creator split
             creatorSwapFeeAmount = fee * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6;
             protocolSwapFeeAmount = fee - creatorSwapFeeAmount;
-        } else {
-            creatorSwapFeeAmount = 0;
-            protocolSwapFeeAmount = 0;
         }
         Currency feeCurrency = exactIn != params.zeroForOne ? key.currency0 : key.currency1;
 
@@ -525,11 +524,11 @@ contract AngstromL2 is
         return x > y ? x : y;
     }
 
-    function _getBlock() internal view returns (uint128) {
-        if (address(FLASH_BLOCK_NUMBER_PROVIDER) == address(0)) {
-            return uint128(block.number);
+    function _getBlock() internal view returns (uint96) {
+        if (address(flashBlockNumberProvider) == address(0)) {
+            return uint96(block.number);
         }
-        return uint128(FLASH_BLOCK_NUMBER_PROVIDER.getFlashblockNumber());
+        return uint96(flashBlockNumberProvider.getFlashblockNumber());
     }
 
     function _getSwapTaxAmount() internal view returns (uint256) {

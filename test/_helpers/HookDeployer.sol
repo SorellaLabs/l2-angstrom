@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
-import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 abstract contract HookDeployer is Test {
@@ -35,7 +34,6 @@ abstract contract HookDeployer is Test {
             }
 
             if (validateHookPermissions(addr, requiredPermissions)) {
-                console.log("params.salt: %s", params.salt);
                 return (addr, bytes32(params.salt));
             }
 

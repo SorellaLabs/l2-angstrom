@@ -21,6 +21,7 @@ import {AngstromL2Factory} from "../src/AngstromL2Factory.sol";
 import {AngstromL2} from "../src/AngstromL2.sol";
 import {getRequiredHookPermissions, POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
+import {IHookAddressMiner} from "../src/interfaces/IHookAddressMiner.sol";
 
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
@@ -53,7 +54,9 @@ contract AngstromL2Test is BaseTest {
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
 
-        factory = new AngstromL2Factory(factoryOwner, manager, IFlashBlockNumber(address(0)));
+        factory = new AngstromL2Factory(
+            factoryOwner, manager, IFlashBlockNumber(address(0)), IHookAddressMiner(address(0))
+        );
 
         bytes32 salt = mineAngstromL2Salt(
             address(factory),
@@ -64,7 +67,7 @@ contract AngstromL2Test is BaseTest {
             getRequiredHookPermissions()
         );
 
-        angstrom = AngstromL2(payable(factory.deployAngstromL2(hookOwner, salt)));
+        angstrom = factory.deployNewHook(hookOwner, salt);
     }
 
     function initializePool(address asset1, int24 tickSpacing, int24 startTick)
