@@ -22,6 +22,10 @@ import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 contract BaseTest is Test, HookDeployer {
     using FormatLib for *;
 
+    struct Random {
+        bytes32 state;
+    }
+
     bool constant DEBUG = false;
 
     uint256 internal constant REAL_TIMESTAMP = 1721652639;
@@ -75,6 +79,11 @@ contract BaseTest is Test, HookDeployer {
                 address(angstrom)
             )
         );
+    }
+
+    function randomI24(Random memory r) internal pure returns (int24) {
+        r.state = keccak256(abi.encode(r.state));
+        return int24(int256(uint256(r.state)));
     }
 
     function pythonRunCmd() internal pure returns (string[] memory args) {

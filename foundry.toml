@@ -34,6 +34,7 @@ exclude_lints = [
   "screaming-snake-case-immutable",
   "erc20-unchecked-transfer",
   "unsafe-cheatcode",
+  "unsafe-typecast",
 ]
 
 [profile.default.fmt]

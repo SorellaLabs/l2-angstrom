@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {LibBit} from "solady/src/utils/LibBit.sol";
 import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
-import {console} from "forge-std/console.sol";
 
 /// @author philogy <https://github.com/philogy>
 library Math512Lib {

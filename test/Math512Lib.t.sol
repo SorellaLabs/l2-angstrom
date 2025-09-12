@@ -4,9 +4,6 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {Math512Lib} from "src/libraries/Math512Lib.sol";
 
-import {console} from "forge-std/console.sol";
-import {FormatLib} from "super-sol/libraries/FormatLib.sol";
-
 contract Math512LibTest is Test {
     function test_fuzzing_ffi_div512by256(uint256 x1, uint256 x0, uint256 d) public {
         d = bound(d, 1, type(uint256).max);

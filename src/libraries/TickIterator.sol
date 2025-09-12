@@ -83,6 +83,11 @@ library TickIteratorLib {
         return self.currentTick <= self.endTick;
     }
 
+    function peekNext(TickIteratorUp memory self) internal pure returns (int24) {
+        if (!hasNext(self)) revert NoNext();
+        return self.currentTick;
+    }
+
     /// @notice Get the next tick and advance the iterator
     /// @param self The iterator
     /// @return tick The next initialized tick
@@ -105,7 +110,7 @@ library TickIteratorLib {
             (initialized, bitPos) = self.currentWord.nextBitPosGte(bitPos);
             self.currentTick = TickLib.toTick(wordPos, bitPos, self.tickSpacing);
             if (initialized) break;
-        } while (self.currentTick < self.endTick);
+        } while (self.currentTick <= self.endTick);
     }
 
     // ============ Downward Iterator (High to Low) ============

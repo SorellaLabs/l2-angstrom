@@ -15,10 +15,18 @@ import {RouterActor} from "../_mocks/RouterActor.sol";
 import {UniV4Inspector} from "../_mocks/UniV4Inspector.sol";
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+import {DynamicArrayLib, DynamicArray} from "solady/src/utils/g/DynamicArrayLib.sol";
+import {TickLib} from "src/libraries/TickLib.sol";
+import {LibSort} from "solady/src/utils/LibSort.sol";
+import {console} from "forge-std/console.sol";
+import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 
 contract TickIteratorTest is BaseTest {
     using PoolIdLibrary for PoolKey;
+    using TickLib for int24;
     using IUniV4 for IPoolManager;
+    using DynamicArrayLib for *;
+    using FormatLib for *;
 
     UniV4Inspector manager;
     RouterActor router;
@@ -123,6 +131,58 @@ contract TickIteratorTest is BaseTest {
         assertEq(iter.getNext(), 100, "Should include end boundary 100");
 
         assertFalse(iter.hasNext());
+    }
+
+    function test_fuzzing_iterateUp(bytes32 seed) public {
+        Random memory r = Random(seed);
+        int256[] memory ticks = new int256[](10);
+        uint256 length = 0;
+        while (length < 10) {
+            int24 tick = randomTick(r);
+            uint256 j = 0;
+            for (; j < length; j++) {
+                if (ticks[j] == tick) break;
+            }
+            if (j == length) ticks[length++] = tick;
+        }
+        for (uint256 i = 0; i < length / 2; i++) {
+            (int24 tickLower, int24 tickUpper) =
+                sortTicks(int24(ticks[i * 2]), int24(ticks[i * 2 + 1]));
+            addLiquidityAtTicks(tickLower, tickUpper);
+        }
+        LibSort.insertionSort(ticks);
+        (int24 start, int24 end) = sortTicks(randomTick(r), randomTick(r));
+        TickIteratorUp memory iter = TickIteratorLib.initUp(manager, pid, TICK_SPACING, start, end);
+        for (uint256 i = 0; i < length; i++) {
+            int24 tick = int24(ticks[i]);
+            if (end < tick) break;
+            if (tick <= start) continue;
+
+            assertTrue(
+                iter.hasNext(),
+                iter.hasNext() ? "" : logTicks("iterator ended early", start, end, ticks, i)
+            );
+            int24 nextTick = iter.peekNext();
+            assertEq(
+                nextTick,
+                tick,
+                nextTick != tick ? logTicks("tick mismatch", start, end, ticks, i) : ""
+            );
+            iter.getNext();
+        }
+
+        assertFalse(
+            iter.hasNext(),
+            iter.hasNext()
+                ? logTicks(
+                    string.concat("iterator not depleted (next: ", iter.peekNext().toStr(), ")"),
+                    start,
+                    end,
+                    ticks,
+                    999
+                )
+                : ""
+        );
     }
 
     function test_iterateUp_acrossWords() public {
@@ -735,5 +795,40 @@ contract TickIteratorTest is BaseTest {
         assertTrue(iter2.hasNext());
         assertEq(iter2.getNext(), 0);
         assertFalse(iter2.hasNext());
+    }
+
+    function randomTick(Random memory r) internal pure returns (int24) {
+        r.state = keccak256(abi.encode(r.state));
+        uint256 rawValue =
+            uint256(r.state) % uint256(int256(TickMath.MAX_TICK) - int256(TickMath.MIN_TICK) + 1);
+        int24 tick = int24(int256(rawValue) + TickMath.MIN_TICK).normalizeUnchecked(TICK_SPACING);
+        if (tick < TickMath.MIN_TICK) tick += TICK_SPACING;
+        if (tick > TickMath.MAX_TICK) tick -= TICK_SPACING;
+        require(TickMath.MIN_TICK <= tick && tick <= TickMath.MAX_TICK, "Tick out of bounds");
+        return tick;
+    }
+
+    function sortTicks(int24 tickLower, int24 tickUpper) internal pure returns (int24, int24) {
+        if (tickLower > tickUpper) (tickLower, tickUpper) = (tickUpper, tickLower);
+        return (tickLower, tickUpper);
+    }
+
+    function logTicks(
+        string memory message,
+        int24 start,
+        int24 end,
+        int256[] memory ticks,
+        uint256 wrongIndex
+    ) internal pure returns (string memory) {
+        string memory result =
+            string.concat(message, ", start: ", start.toStr(), ", end: ", end.toStr(), ", ticks: [");
+
+        for (uint256 i = 0; i < ticks.length; i++) {
+            if (i > 0) result = string.concat(result, ", ");
+            if (i == wrongIndex) result = string.concat(result, "(", ticks[i].toStr(), ")");
+            else result = string.concat(result, ticks[i].toStr());
+        }
+        result = string.concat(result, "]");
+        return result;
     }
 }

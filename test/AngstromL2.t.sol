@@ -6,7 +6,6 @@ import {RouterActor} from "./_mocks/RouterActor.sol";
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {UniV4Inspector} from "./_mocks/UniV4Inspector.sol";
 
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
