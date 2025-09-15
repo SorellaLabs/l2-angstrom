@@ -7,7 +7,7 @@
 This note explains how the compensation price is determined when the price lies within the swap price range $p_\star \in [p_l, p_u]$.
 ## Variables & Definitions
 
-- $ L_i > 0$: virtual liquidity for range $i$ ($L_i = \sqrt{x_i y_i}$ where $x_i, y_i$ are the virtual reserves for range $i$)
+- $L_i > 0$: virtual liquidity for range $i$ ($L_i = \sqrt{x_i y_i}$ where $x_i, y_i$ are the virtual reserves for range $i$)
 - $p_{i} > 0$ is the price of the lower boundary of range $i$
 - $p_\star > 0$: post-trade effective compensation price
 - $B > 0$ is the bid/liquidity compensation amount.
@@ -21,9 +21,9 @@ $$\hat X =\sum_i L_i(\frac{1}{\sqrt{a_i}}-\frac{1}{\sqrt{b_i}}),\qquad \hat Y = 
 
 Assuming unsigned total deltas $X = \sum_i {\Delta x_i}, Y=\sum_i \Delta y_i$ the final compensation price $p_\star$ is defined as:
 
-**Zero-for-One Swap:** $p_\star = \frac{Y}{X + B}$ such that each range $i$ trades $\Delta x'_i = \Delta y_i \cdot (\min \{p_\star, \frac{\Delta y_i}{\Delta x_i}\})^{-1}$
+**Zero-for-One Swap:** $p_\star = \frac{Y}{X + B}$ such that each range $i$ trades $\Delta x_i' = \Delta y_i \cdot (\min\{p_\star, \frac{\Delta y_i}{\Delta x_i}\})^{-1}$
 
-**One-for-Zero Swap:** $p_\star = \frac{Y}{X- B}$ such that each range $i$ trades $\Delta x'_i = \Delta y_i \cdot (\max \{p_\star, \frac{\Delta y_i}{\Delta x_i}\})^{-1}$
+**One-for-Zero Swap:** $p_\star = \frac{Y}{X- B}$ such that each range $i$ trades $\Delta x_i' = \Delta y_i \cdot (\max\{p_\star, \frac{\Delta y_i}{\Delta x_i}\})^{-1}$
 
 
 
@@ -31,7 +31,7 @@ Assuming unsigned total deltas $X = \sum_i {\Delta x_i}, Y=\sum_i \Delta y_i$ th
 
 Notice from the above definition that there will be a consecutive sub-set of ranges which will trade at ($p_\star \le \frac{\Delta y_i}{\Delta x_i}$ for zero-for-one, $p_\star \ge \frac{\Delta y_i}{\Delta x_i}$ for one-for-zero).
 
-This range can be determined by walking from $p_{start} \rightarrow p_{end}$ and keeping track of the total sum so far $\hat X = \sum_i {\Delta x_i},\hat Y=\sum_i \Delta y_i$. At each step checking $\tilde p_i = \frac{\hat Y}{\hat X + B}/\tilde p_i = \frac{\hat Y}{\hat X - B} $ depending on the swap direction. If $\tilde p_i$ is outside of the current range the current range will be part of the consecutive set.
+This range can be determined by walking from $p_{start} \rightarrow p_{end}$ and keeping track of the total sum so far $\hat X = \sum_i {\Delta x_i},\hat Y=\sum_i \Delta y_i$. At each step checking $\tilde p_i = \frac{\hat Y}{\hat X + B}/\tilde p_i = \frac{\hat Y}{\hat X - B}$ depending on the swap direction. If $\tilde p_i$ is outside of the current range the current range will be part of the consecutive set.
 
 If all ranges are depleted and $\tilde p_{end}$ lies beyond $p_{end}$ then we can take $p_\star := \tilde p_{end}$.
 
@@ -84,16 +84,15 @@ $\phi'(s) = 2As + 2L$
 **$\phi'(u) \ge 0$:**
 - Expand $\phi'(u)$: $2Au + 2L \ge 0 \Leftrightarrow 2 (B + \tilde X - x)u \ge -2L$
 - Prove tighter bound: $B + \tilde X - x \ge -x \Rightarrow 2(-x)u \ge -2L \Rightarrow 2Au \ge -2L$
-- Use $u = \sqrt\frac{y}{x}$:$\quad 2 (-x)\sqrt{\frac{y}{x}} \ge -2\sqrt{xy} \Leftrightarrow x\sqrt\frac{y}{x} \le \sqrt{xy} \Leftrightarrow \sqrt{x^2 \frac{y}{x}}  = \sqrt{xy} $
+- Use $u = \sqrt\frac{y}{x}$: $\quad 2 (-x)\sqrt{\frac{y}{x}}\ge -2\sqrt{xy}\Leftrightarrow x\sqrt{\frac{y}{x}}\le\sqrt{xy}\Leftrightarrow\sqrt{x^2\frac{y}{x}}=\sqrt{xy}$
 
 ### Lemma 2: Boundary signs $\phi(0) < 0$ and $\phi(u) \ge 0$
 
 $\phi(0) \lt 0$: $ - (\tilde Y + y) < 0 $
 $\phi(u) \ge 0$:
 - Expand $\phi(u)$: $Au^2+2Lu-(\tilde Y + y) \ge 0$
-- Expand $A$ and simplify: $ (B + \hat X - x)u^2+2y-\tilde Y - y \ge 0 \Leftrightarrow (B + \tilde X)u^2  \ge 
-\tilde Y$
-- Reorganize & expand $u^2$: $p_{i+1} \ge \frac{\tilde Y}{B + \tilde X}$
+- Expand $A$ and simplify: $(B + \hat X - x)u^2+2y-\tilde Y - y \ge 0 \Leftrightarrow (B + \tilde X)u^2  \ge \tilde Y$
+- Reorganize & expand $u^2$: $p_{i+1}\ge\frac{\tilde Y}{B + \tilde X}$
 - Recognize that $\tilde p = \frac{\tilde Y}{B + \tilde X}$ and that $p_{i+1} \ge \tilde p$ is the precondition for beginning this calculation
 
 ### Lemma 3: Unique Solution in $(0,u]$
@@ -123,17 +122,13 @@ Together we've shown that there is always a positive solution for $\sqrt {p_\sta
 ## One-for-Zero (price increasing)
 For a given tick $i$ that is being swapped through, we have:
 
-$$\Delta x = L\left(\frac{1}{\sqrt{p_i}}-\frac{1}{\sqrt{p_\star}}\right),\qquad
-\Delta y = L\cdot(\sqrt{p_\star}-\sqrt{p_i}),\qquad
-B = \frac{\hat Y+\Delta y}{p_\star} - (\hat X+\Delta x).
-$$1
+$$\Delta x = L\left(\frac{1}{\sqrt{p_i}}-\frac{1}{\sqrt{p_\star}}\right),\qquad\Delta y = L\cdot(\sqrt{p_\star}-\sqrt{p_i}),\qquad B = \frac{\hat Y+\Delta y}{p_\star} - (\hat X+\Delta x).$$
 
 ### Quadratic in $\sqrt{p_\star}$
 
-Clearing denominators, substituting $A := \tilde X + x -B, s =\sqrt{p_\star} $ simplifying yields:
+Clearing denominators, substituting $A := \tilde X + x -B, s =\sqrt{p_\star}$ simplifying yields:
 
-
-$$ As^2−2L​s−(\tilde Y−y) = 0$$
+$$As^2−2L​s−(\tilde Y−y) = 0$$
 
 Solutions:
 
