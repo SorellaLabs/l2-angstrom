@@ -37,7 +37,7 @@ If all ranges are depleted and $\tilde p_{end}$ lies beyond $p_{end}$ then we ca
 
 Otherwise when a range is found such that $\tilde p_i \in [p_i, p_{i+1}]$ we need to calculate the actual $p_\star$ that satisfies our original formula.
 
-## Case A — Zero-for-One (price decreasing)
+## Zero-for-One (price decreasing)
 
 ### Setup
 For a given tick $i$ that is being swapped through, we have:
@@ -72,7 +72,7 @@ Let's take the above quadratic as a function $\phi(s)$ s.t. $\phi(\sqrt{p_\star}
 
 $$\phi(s) =A s^2 + 2Ls - (\hat Y+y)$$
 
-#### Lemma 1: Monotonicity of $\phi(s)$ over $(0,u]$
+### Lemma 1: Monotonicity of $\phi(s)$ over $(0,u]$
 
 We prove that $\phi(s)$ monotonically increases for $s \in (0, u]$ by showing that $\phi'(s) \ge 0$ in that range:
 
@@ -86,7 +86,7 @@ $\phi'(s) = 2As + 2L$
 - Prove tighter bound: $B + \tilde X - x \ge -x \Rightarrow 2(-x)u \ge -2L \Rightarrow 2Au \ge -2L$
 - Use $u = \sqrt\frac{y}{x}$:$\quad 2 (-x)\sqrt{\frac{y}{x}} \ge -2\sqrt{xy} \Leftrightarrow x\sqrt\frac{y}{x} \le \sqrt{xy} \Leftrightarrow \sqrt{x^2 \frac{y}{x}}  = \sqrt{xy} $
 
-#### Lemma 2: Boundary signs $\phi(0) < 0$ and $\phi(u) \ge 0$
+### Lemma 2: Boundary signs $\phi(0) < 0$ and $\phi(u) \ge 0$
 
 $\phi(0) \lt 0$: $ - (\tilde Y + y) < 0 $
 $\phi(u) \ge 0$:
@@ -96,55 +96,117 @@ $\phi(u) \ge 0$:
 - Reorganize & expand $u^2$: $p_{i+1} \ge \frac{\tilde Y}{B + \tilde X}$
 - Recognize that $\tilde p = \frac{\tilde Y}{B + \tilde X}$ and that $p_{i+1} \ge \tilde p$ is the precondition for beginning this calculation
 
-#### Lemma 3: Unique Solution in $(0,u]$
+### Lemma 3: Unique Solution in $(0,u]$
 
 Using Lemma 1 & 2 and the Intermediate value theorem we now know that there is exactly one $s \in (0,u]$ s.t. $\phi(s) = 0$ and therefore only one solution to the quadratic in that range.
 
-#### Lemma 4: $s_+$ is that solution
+### Lemma 4: $s_+$ is that solution
 
 $$s_+ = \frac{-L + \sqrt{D}}{A}, D:=L^2 + A(\hat Y+y)$$
-$$s_- = \frac{-L - \sqrt{D}}{A}, D:=L^2 + A(\hat Y+y)$$
+$$s_- = \frac{-L - \sqrt{D}}{A}$$
 
 **$A > 0$:** trivially $s_- < 0$, leaving $s_+$ as the only positive solution.
 
 **$A < 0$:**
-$$\frac{-L + \sqrt{L^2 + A(\hat Y+y)}}{A} > 0$$
-$$\frac 1 A\sqrt{L^2 + A(\hat Y+y)} - \frac{L}{A} > 0$$
-$$\frac 1 A\sqrt{{L^2} + {A(\hat Y+y)}} > \frac{L}{A} $$
 
-- $A > 0$: $\sqrt{\frac{L^2}{A^2} + \frac{\hat Y+y}{A}}^2 > (\frac{L}{A})^2  \Leftrightarrow \frac{L^2}{A^2} + \frac{\hat Y+y}{A} > \frac{L^2}{A^2} \Leftrightarrow   \frac{\hat Y+y}{A} > 0$ (which is true because $\tilde Y, y, A > 0$)
-- $A < 0$: $\sqrt{{L^2} + {A(\hat Y+y)}} < L$ Assuming solution is real ($D \ge 0$ in $\sqrt D$) then the inequality naturally holds because $(\tilde Y + y) > 0, A <0 \Rightarrow A(\tilde Y+y) < 0 \Rightarrow \sqrt {x^2 - \gamma} < x$
-    - Now we need to prove $D \ge 0$:
-        $${L^2} + {A(\hat Y+y)} \ge 0$$
-        $${L^2} + A\hat Y+Ay \ge 0$$
-        $${L^2} + A\hat Y+(\tilde X + B - x)y \ge 0$$
-        $${L^2} + A\hat Y+(\tilde X + B)y - L^2 \ge 0$$
-        $$(\tilde X + B)y \ge (-A)\hat Y$$
-        $$\frac y {-A} \ge \frac{\tilde Y}{\tilde X + B}$$
-        $$\frac y {x - (\tilde X + B)} \ge \tilde p$$
-        Given $x>0, -A>0,\tilde X + B\ge0 \Rightarrow \frac y {x - (\tilde X + B)}\ge\frac{y}{x}$ therefore we know that proving the tighter inequality $\frac{y}{x} \ge \tilde p$, which is the precondition for this calculation, is equivalent to proving the original. Therefore $D \ge 0$
+When $A < 0$ then $\sqrt D < L$. This leads to both $s_+$ and $s_-$ being positive. However in this case we can show that:
 
-**$s_+ \le u$:**
-$$\frac{-L + \sqrt{L^2 + A(\hat Y+y)}}{A} \le u$$
+$$s_+ < s_-$$
+$$\frac{-L + \sqrt{D}}{A} < \frac{-L - \sqrt{D}}{A}$$
+$$-L + \sqrt{D} > -L - \sqrt{D}$$
+$$\sqrt{D} > - \sqrt{D}$$
 
+### All together
 
+Together we've shown that there is always a positive solution for $\sqrt {p_\star}$ that lies between $0$ and $\sqrt{p_{i+1}}$ and that it's calculated via the positive solution from the quadratic.
 
+## One-for-Zero (price increasing)
+For a given tick $i$ that is being swapped through, we have:
 
+$$\Delta x = L\left(\frac{1}{\sqrt{p_i}}-\frac{1}{\sqrt{p_\star}}\right),\qquad
+\Delta y = L\cdot(\sqrt{p_\star}-\sqrt{p_i}),\qquad
+B = \frac{\hat Y+\Delta y}{p_\star} - (\hat X+\Delta x).
+$$1
 
+### Quadratic in $\sqrt{p_\star}$
 
-
+Clearing denominators, substituting $A := \tilde X + x -B, s =\sqrt{p_\star} $ simplifying yields:
 
 
+$$ As^2−2L​s−(\tilde Y−y) = 0$$
 
-Let $\phi(\sqrt{p_\star}):=A \sqrt{p_\star}^2 + 2L\sqrt{p_\star} - (\hat Y+y)$. Then
-$$\phi(0)=-(\hat Y+y) < 0,\qquad
-\phi(\sqrt{p_{i+1}})= (B+\hat X - x)\sqrt{p_\star}^2 + 2L\sqrt{p_\star} - (\hat Y+y).$$
+Solutions:
 
-Using $2L\sqrt{p_\star}=2y$ and $x \sqrt{p_{i+1}}^2 = y$,
-$$\phi(u)=(B+\hat X)\sqrt{p_{i+1}}^2 - \hat Y = \big(B - B_0^{\downarrow}\big)\sqrt{p_{i+1}}^2,\qquad
-B_0^{\downarrow} := \frac{\hat Y}{\sqrt{p_{i+1}}^2} - \hat X \ (\ge 0 \text{ by } p_u\le \hat Y/\hat X).$$
+$$\sqrt{p_\star}=\frac{L \pm \sqrt{L^2 + A(\hat Y-y)}}{A}
+=\frac{L \pm \sqrt{\hat Y\cdot(x+\hat X - B)-  y\cdot(\hat X - B)}}{x+\hat X - B}.$$
 
-Hence, if $\boxed{B \ \ge\ B_0^{\downarrow} := \frac{\hat Y}{\sqrt{p_{i+1}}^2} - \hat X}$
-then $\phi(0)<0$ and $\phi(u)\ge 0$. Moreover,
-$$\phi'(\sqrt{p_\star})=2A\sqrt{p_\star}+2L \ \ge\ 2(-x)\sqrt{p_\star}+2L = 2L\!\left(1-\frac{\sqrt{p_\star}}{\sqrt{p_{i+1}}}\right) > 0 \quad \text{for } \sqrt{p_\star}\in(0,\sqrt{p_{i+1}}],$$
-since $A=B+\hat X-x>-x$. Therefore $\phi$ is **strictly increasing** on $(0,\sqrt{p_{i+1}}]$, giving **exactly one** root in $(0,\sqrt{p_{i+1}}]$.
+### Lemma 1: Monotonicity in range $[l, +\infty)$ (where $l = \sqrt{p_i}$)
+
+$$\phi'(s) = 2As - 2L$$
+$$\phi'(s) \ge 0 \Leftrightarrow s \ge \frac{L}{A}$$
+
+We'll call the point $ \frac L A$ at which $\phi(s)$ becomes monotonically increasing $s_0$ it may or may not lie in the range $[l, +geinfty)$
+
+### Lemma 2: Negative Lower Range Bound $\phi(s_0) \le 0$
+
+$$\phi(s_0) \le 0$$
+$$ A(\frac{L}{A})^2−2L​(\frac{L}{A})−(\tilde Y−y) \le 0$$
+$$ -\frac {L^2} A −(\tilde Y−y) \le 0$$
+$$ -\frac {L^2} A  \le (\tilde Y−y)$$
+$$ - {L^2} \le (\tilde Y−y) A$$
+$$ - {L^2} \le \tilde Y A − y (\tilde X - B) - yx$$
+$$ 0 \le \tilde Y A − y (\tilde X - B)$$
+$$ y (\tilde X - B) \le \tilde Y A  $$
+
+$\tilde X - B < 0$:
+- Reorganize into fractions: $\frac y A \ge \frac {\tilde Y}{\tilde X - B}$
+- Trivially true because $y > 0, A > 0, \tilde Y > 0$
+
+$\tilde X - B > 0$
+- Reorganize into fractions: $\frac y {x + (\tilde X - B)} \le \frac {\tilde Y}{\tilde X - B}$
+- Tighten inequality: $\frac y x \le \frac {\tilde Y}{\tilde X - B}$
+- Trivially true as it's the pre-condition to the computation
+
+### Lemma 3: Unique solution in $[s_0, +\infty)$
+Using the above lemmas together with a intermediate value theorem we now know that there is a unique solution in this range.
+
+### Lemma 4: $s_+ \in [s_0, +\infty)$
+$$s_+=\frac{L + \sqrt{D}}{A}, D:=L^2 + A(\hat Y-y)$$
+$$s_-=\frac{L - \sqrt{D}}{A}$$
+
+When $\hat Y-y \ge 0$:
+- $A(\tilde Y - y) \ge 0 \Rightarrow D \ge L^2 \Rightarrow \sqrt D \ge L$ 
+- Trivially: $s_- < 0$ leaving $s_+$ as the only positive solution.
+
+When $\hat Y-y \lt 0$:
+- $\sqrt D \lt L$ following the above reasoning, meaning both $s_+$ and $ s_-$ are positive
+- However we can trivially see that $s_+ > s_-$
+- Because exactly one solution must lie in $[s_0, +\infty)$ it must be $s_+$ because if it were $s_-$ it would lead to a contradiction requiring $s_+ > s_-$ but also $s_+ \notin [s_0, +\infty)$.
+
+### Lemma 5: $s_+ \ge l$
+
+$$\frac{L + \sqrt{D}}{A} \ge l$$
+$${L + \sqrt{D}} \ge l (x + \tilde X - B)$$
+$${L + \sqrt{D}} \ge L +l (\tilde X - B)$$
+$$\sqrt{D} \ge l (\tilde X - B)$$
+
+When $\tilde X - B < 0$: Inequality true because left side is positive and left side negative.
+
+When $\tilde X -B \ge 0$:
+
+$$D \ge p_i (\tilde X - B)^2$$
+$$L^2 + A (\tilde Y - y) \ge p_i (\tilde X - B)^2$$
+$$L^2 + A \tilde Y - y x - y(\tilde X - B) \ge p_i (\tilde X - B)^2$$
+$$A \tilde Y - y(\tilde X - B) \ge p_i (\tilde X - B)^2$$
+$$A \tilde Y \ge p_i (\tilde X - B)^2 + y(\tilde X - B)$$
+$$A \tilde Y \ge p_i (\tilde X - B)^2 + p_i x(\tilde X - B)$$
+$$A \tilde Y \ge p_i \cdot(\tilde X - B)\cdot((\tilde X - B) + x)$$
+$$A \tilde Y \ge p_i \cdot(\tilde X - B)\cdot((\tilde X - B) + x)$$
+$$\frac{ \tilde Y}{\tilde X - B} \ge p_i \cdot 1$$
+$$\tilde p \ge p_i $$
+
+This is the precondition for the calculation which makes our lemma $s_+ \ge l$ true!
+
+### Final Proposition
+
+Thanks to lemmas 3-5 we have now proven the required facts to know that $s_+$ gives us the unique $\sqrt{p_\star}$.
