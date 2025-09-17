@@ -1,13 +1,9 @@
+from bdb import effective
 from dataclasses import dataclass
 from decimal import getcontext, Decimal as D
 import sys
 from typing import Callable
 from collections.abc import Generator
-
-
-def emit_error(msg):
-    print(msg, file=sys.stderr)
-    sys.exit(1)
 
 
 def from_solidity_int(x: int) -> int:
@@ -161,44 +157,51 @@ class TickState:
         end_lower: PricedTick,
         compensation_price: D,
     ) -> Generator[tuple[PricedTick, PricedTick, D], None, None]:
-        print(f"\nZero-for-One Compensation Amount", file=sys.stderr)
         pstar_sqrt = compensation_price.sqrt()
-        print(f"pstar_sqrt: {pstar_sqrt:.6f}", file=sys.stderr)
         for upper, lower in self.get_ranges_zero_for_one(start_upper, end_lower):
             liquidity = self.get_liquidity(lower.tick)
-            print(
-                f"{upper.sqrt_price:.6f} -> {lower.sqrt_price:.6f} ({upper.tick:3} -> {lower.tick:3}) [{liquidity/10**18:.6f}]", file=sys.stderr)
             if pstar_sqrt >= upper.sqrt_price:
                 break
             if liquidity == 0:
                 range_comp = D(0)
             else:
-                dx = delta_x(
-                    max(lower.sqrt_price, pstar_sqrt),
-                    upper.sqrt_price,
-                    liquidity
-                )
-                dy = delta_y(
-                    max(lower.sqrt_price, pstar_sqrt),
-                    upper.sqrt_price,
-                    liquidity
-                )
-                print(f"  dx: {dx/10**18:.6f}", file=sys.stderr)
-                print(f"  dy: {dy/10**18:.6f}", file=sys.stderr)
+                real_lower_sqrt_price = max(lower.sqrt_price, pstar_sqrt)
+                dx = delta_x(real_lower_sqrt_price,
+                             upper.sqrt_price, liquidity)
+                dy = delta_y(real_lower_sqrt_price,
+                             upper.sqrt_price, liquidity)
                 range_comp = dy / compensation_price - dx
-                print(
-                    f"  range_comp: {range_comp/10**18:.6f}", file=sys.stderr)
 
             assert range_comp >= 0, "range_comp negative"
             yield (lower, upper, range_comp)
 
     def get_one_for_zero_compensation_amount(self, start_lower: PricedTick, end_upper: PricedTick, compensation_price: D) -> Generator[tuple[PricedTick, PricedTick, D], None, None]:
+        pstar_sqrt = compensation_price.sqrt()
+        dprint(
+            f"Getting one for zero compensation amount (pstar_sqrt: {pstar_sqrt:.6f}):")
         for lower, upper in self.get_ranges_one_for_zero(start_lower, end_upper):
             liquidity = self.get_liquidity(lower.tick)
-            dx = delta_x(lower.sqrt_price, upper.sqrt_price, liquidity)
-            dy = delta_y(lower.sqrt_price, upper.sqrt_price, liquidity)
-            range_comp = dx - dy / compensation_price
+            dprint(
+                f"  {lower.sqrt_price:.6f} -> {upper.sqrt_price:.6f} ({lower.tick:3}, {upper.tick:3}) [{liquidity/1e18:.2f}]")
+            if pstar_sqrt <= lower.sqrt_price:
+                break
+            if liquidity == 0:
+                range_comp = D(0)
+            else:
+                effective_upper_sqrt_price = min(pstar_sqrt, upper.sqrt_price)
+                dx = delta_x(
+                    lower.sqrt_price,
+                    effective_upper_sqrt_price,
+                    liquidity
+                )
+                dy = delta_y(
+                    lower.sqrt_price,
+                    effective_upper_sqrt_price,
+                    liquidity
+                )
+                range_comp = dx - dy / compensation_price
             assert range_comp >= 0, "range_comp negative"
+            dprint(f"    comp: {range_comp/10**18:.8f}")
             yield (lower, upper, range_comp)
 
     def get_reward_share(self, position: Position, rewards: dict[int, D]) -> D:
@@ -222,9 +225,8 @@ def distribute_rewards_ranges(
         tick_state,
         start,
         end,
-        total_compensation_amount
+        total_compensation_amount,
     )
-    print("Reward Ranges:", file=sys.stderr)
     rewards = {tick: D(0) for tick in tick_state.sorted_ticks}
     if direction_zero_for_one:
         for lower, _, range_comp in tick_state.get_zero_for_one_compensation_amount(start, end, compensation_price):
@@ -260,13 +262,21 @@ def compute_and_verify_compensation_price(
             total_compensation_distributed += range_comp
 
     assert quasi_eq(total_compensation_distributed, D(total_compensation_amount)), \
-        f"Total compensation distributed is not equal to total compensation amount ({total_compensation_distributed} != {total_compensation_amount})"
+        f"Total compensation distributed is not equal to total compensation amount ({total_compensation_distributed/10**18:.8f} != {total_compensation_amount/10**18:.8f})"
 
     return compensation_price
 
 
 def quasi_eq(a: D, b: D) -> bool:
     return abs(a - b) < D('1e-10')
+
+
+DEBUG = False
+
+
+def dprint(*args, **kwargs):
+    if DEBUG:
+        print(*args, **kwargs, file=sys.stderr)
 
 
 def compute_compensation_price(
@@ -276,6 +286,7 @@ def compute_compensation_price(
     end: PricedTick,
     total_compensation_amount: int,
 ) -> D:
+    dprint(f"Computing compensation price")
 
     sum_x = D(0)
     sum_y = D(0)
@@ -303,30 +314,67 @@ def compute_compensation_price(
     else:
         for lower, upper in tick_state.get_ranges_one_for_zero(start, end):
             liquidity = tick_state.get_liquidity(lower.tick)
+            dprint(
+                f"  {lower.sqrt_price:.12f} -> {upper.sqrt_price:.12f} ({lower.tick:3}, {upper.tick:3}) [{liquidity/1e18:.2f}]")
             dx = delta_x(lower.sqrt_price, upper.sqrt_price, liquidity)
             dy = delta_y(lower.sqrt_price, upper.sqrt_price, liquidity)
+            sum_x += dx
+            sum_y += dy
 
+            if sum_x - total_compensation_amount <= 0:
+                dprint("    (skipped because pstar guess is negative)")
+                continue
+            dprint(
+                f"    guessing with Xhat: {sum_x/10**18:.8f}, Yhat: {sum_y/10**18:.8f}, avg p: {sum_y / sum_x:.8f}")
+
+            pstar_guess_sqrt = (
+                sum_y / (sum_x - total_compensation_amount)
+            ).sqrt()
+            dprint(f"    pstar_guess_sqrt: {pstar_guess_sqrt:.6f}")
             # within range
-            if (net_x := sum_x + dx - total_compensation_amount) >= 0\
-                    and (pstar_guess_sqrt := ((sum_y + dy) / net_x).sqrt()) <= upper.sqrt_price:
-                virtual_x: D = D(liquidity) * lower.sqrt_price
-                virtual_y: D = D(liquidity) / lower.sqrt_price
+            if pstar_guess_sqrt <= upper.sqrt_price:
+                virtual_x: D = D(liquidity) / lower.sqrt_price
+                virtual_y: D = D(liquidity) * lower.sqrt_price
+                sum_x -= dx
+                sum_y -= dy
+                dprint(
+                    f"    computing pstar with Xhat: {sum_x/10**18:.8f}, Yhat: {sum_y/10**18:.8f}")
                 a = sum_x + virtual_x - total_compensation_amount
                 det = D(liquidity)**2 + a * (sum_y - virtual_y)
                 pstar_sqrt = (D(liquidity) + det.sqrt()) / a
+                dprint(f"    => pstar_sqrt: {pstar_sqrt:.6f}")
+                phi = a * pstar_sqrt**2 - 2 * liquidity * \
+                    pstar_sqrt + (virtual_y - sum_y)
+                dprint(f"    phi: {phi}")
+                assert quasi_eq(phi, D(0)), f""
                 return pstar_sqrt**2
-            sum_x += dx
-            sum_y += dy
+            else:
+                dprint(
+                    f"    (continue because p~ >= upper.sqrt_price,)")
         pstar = sum_y / (sum_x - total_compensation_amount)
         assert pstar >= 0, "pstar negative"
         return pstar
+
+
+def print_position_rewards(positions: list[Position], position_rewards: list[int] | None):
+    dprint("Position Rewards:")
+
+    def get_reward(i: int) -> str:
+        if position_rewards is None:
+            return " ?"
+        return f"  {position_rewards[i]/10**18:.8f}"
+    for i, position in enumerate(positions):
+        dprint(
+            f"  ({position.tick_lower:3}, {position.tick_upper:3}) [{position.liquidity/1e18:.2f}] {get_reward(i)}",
+        )
 
 
 def main():
     getcontext().prec = 40
 
     if len(sys.argv) != 8:
-        emit_error("Usage: python get-compensation.py <direction> <positions> <start_sqrt_price> <end_sqrt_price> <start_tick> <end_tick> <compensation_amount>")
+        print("Usage: python get-compensation.py <direction> <positions> <start_sqrt_price> <end_sqrt_price> <start_tick> <end_tick> <compensation_amount>", file=sys.stderr)
+        sys.exit(1)
 
     direction_zero_for_one = {
         "zero_for_one": True,
@@ -342,30 +390,22 @@ def main():
     end_tick = int(sys.argv[6])
     total_compensation_amount = int(sys.argv[7])
 
+    dprint(
+        f"total compensation amount: {total_compensation_amount/10**18:.8f}")
+    print_position_rewards(positions, None)
+
     start = PricedTick(start_tick, start_sqrt_price)
     end = PricedTick(end_tick, end_sqrt_price)
     tick_state = TickState.from_positions(positions)
-    print(f"direction_zero_for_one: {direction_zero_for_one}", file=sys.stderr)
-    print(
-        f"total_compensation_amount: {total_compensation_amount / 10**18:.6f}", file=sys.stderr)
+
     compensation_price, tick_rewards = distribute_rewards_ranges(
         direction_zero_for_one, tick_state, start, end, total_compensation_amount
     )
-    print(f'tick_rewards: {tick_rewards}', file=sys.stderr)
 
     position_rewards = [
         round(tick_state.get_reward_share(position, tick_rewards)) for position in positions
     ]
-    print("Positions:", file=sys.stderr)
-
-    for position, reward in zip(positions, position_rewards):
-        print(
-            f"  [{position.tick_lower:3}, {position.tick_upper:3}] {position.liquidity/1e18:10,.2f} {reward/1e18:10,.6f}",
-            file=sys.stderr
-        )
-
-    print(f"position_rewards: {position_rewards}", file=sys.stderr)
-    print(f"pstar sqrt: {compensation_price.sqrt()}", file=sys.stderr)
+    print_position_rewards(positions, position_rewards)
 
     pstar_sqrt_X96 = round(compensation_price.sqrt() * 2**96)
 
