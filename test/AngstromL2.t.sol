@@ -10,6 +10,7 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
@@ -20,6 +21,8 @@ import {VmSafe} from "forge-std/Vm.sol";
 import {AngstromL2Factory} from "../src/AngstromL2Factory.sol";
 import {AngstromL2} from "../src/AngstromL2.sol";
 import {getRequiredHookPermissions, POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
+import {Ownable} from "solady/src/auth/Ownable.sol";
+import {CustomRevert} from "v4-core/src/libraries/CustomRevert.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
 import {IHookAddressMiner} from "../src/interfaces/IHookAddressMiner.sol";
 import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
@@ -982,5 +985,67 @@ contract AngstromL2Test is BaseTest {
             100,
             "total stacked rewards should match total taxes collected"
         );
+    }
+
+    function test_nonOwnerCannotInitializePool() public {
+        // Test that non-owner/non-creator cannot initialize a pool directly through PoolManager
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 0,
+            tickSpacing: 10,
+            hooks: IHooks(address(angstrom))
+        });
+
+        // Try to initialize directly through PoolManager as a random user (not through angstrom.initializeNewPool)
+        address randomUser = makeAddr("random_user");
+        vm.prank(randomUser);
+        // The PoolManager wraps the hook's revert in a WrappedError
+        // Test that we get the correct wrapped error
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CustomRevert.WrappedError.selector,
+                address(angstrom), // target
+                IHooks.beforeInitialize.selector, // beforeInitialize selector
+                abi.encodePacked(Ownable.Unauthorized.selector), // reason as bytes
+                abi.encodePacked(Hooks.HookCallFailed.selector) // additional context
+            )
+        );
+        manager.initialize(key, INIT_SQRT_PRICE);
+    }
+
+    function test_ownerCannotInitializePoolWithDynamicFee() public {
+        // Test that even the owner cannot initialize a pool with dynamic fee flag
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG, // Dynamic fee flag
+            tickSpacing: 10,
+            hooks: IHooks(address(angstrom))
+        });
+
+        // Try to initialize through angstrom.initializeNewPool as the hook owner
+        vm.prank(hookOwner);
+        vm.expectRevert(AngstromL2.IncompatiblePoolConfiguration.selector);
+        angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
+    }
+
+    function test_cannotInitializePoolWithoutETH() public {
+        // Test that pools cannot be initialized without ETH as currency0
+        MockERC20 token2 = new MockERC20();
+
+        // Create a pool key with token as currency0 instead of ETH
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(token)),
+            currency1: Currency.wrap(address(token2)),
+            fee: 0,
+            tickSpacing: 10,
+            hooks: IHooks(address(angstrom))
+        });
+
+        // Try to initialize through angstrom.initializeNewPool as the hook owner
+        vm.prank(hookOwner);
+        vm.expectRevert(AngstromL2.IncompatiblePoolConfiguration.selector);
+        angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
     }
 }

@@ -171,6 +171,8 @@ contract AngstromL2 is
         uint24 creatorTaxFeeE6
     ) public {
         if (!(msg.sender == owner() || msg.sender == FACTORY)) revert Unauthorized();
+        if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
+        if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (feeConfiguration.isInitialized) revert PoolAlreadyInitialized();
         if (!(creatorSwapFeeE6 <= MAX_CREATOR_SWAP_FEE_E6)) revert CreatorFeeExceedsMaximum();
@@ -183,16 +185,8 @@ contract AngstromL2 is
             .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
     }
 
-    function beforeInitialize(address sender, PoolKey calldata key, uint160)
-        external
-        view
-        returns (bytes4)
-    {
-        _onlyUniV4();
-        if (sender != address(this)) revert Unauthorized();
-        if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
-        if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
-        return this.beforeInitialize.selector;
+    function beforeInitialize(address, PoolKey calldata, uint160) external pure returns (bytes4) {
+        revert Unauthorized();
     }
 
     function afterAddLiquidity(
