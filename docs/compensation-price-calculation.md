@@ -122,7 +122,7 @@ Together we've shown that there is always a positive solution for $\sqrt {p_\sta
 ## One-for-Zero (price increasing)
 For a given tick $i$ that is being swapped through, we have:
 
-$$\Delta x = L\left(\frac{1}{\sqrt{p_i}}-\frac{1}{\sqrt{p_\star}}\right),\qquad\Delta y = L\cdot(\sqrt{p_\star}-\sqrt{p_i}),\qquad B = \frac{\hat Y+\Delta y}{p_\star} - (\hat X+\Delta x).$$
+$$\Delta x = L\left(\frac{1}{\sqrt{p_i}}-\frac{1}{\sqrt{p_\star}}\right),\qquad\Delta y = L\cdot(\sqrt{p_\star}-\sqrt{p_i}),\qquad B =  (\hat X+\Delta x) - \frac{\hat Y+\Delta y}{p_\star}.$$
 
 ### Quadratic in $\sqrt{p_\star}$
 
