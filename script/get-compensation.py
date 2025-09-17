@@ -188,6 +188,7 @@ class TickState:
                 range_comp = dy / compensation_price - dx
                 print(
                     f"  range_comp: {range_comp/10**18:.6f}", file=sys.stderr)
+
             assert range_comp >= 0, "range_comp negative"
             yield (lower, upper, range_comp)
 
@@ -223,9 +224,10 @@ def distribute_rewards_ranges(
         end,
         total_compensation_amount
     )
+    print("Reward Ranges:", file=sys.stderr)
     rewards = {tick: D(0) for tick in tick_state.sorted_ticks}
     if direction_zero_for_one:
-        for _, lower, range_comp in tick_state.get_zero_for_one_compensation_amount(start, end, compensation_price):
+        for lower, _, range_comp in tick_state.get_zero_for_one_compensation_amount(start, end, compensation_price):
             initialized_tick = tick_state.get_range_lower(lower.tick)
             assert initialized_tick is not None or range_comp == 0, "initialized_tick is None and range_comp is not 0"
             if initialized_tick is not None:
@@ -281,17 +283,11 @@ def compute_compensation_price(
     if direction_zero_for_one:
         for upper, lower in tick_state.get_ranges_zero_for_one(start, end):
             liquidity = tick_state.get_liquidity(lower.tick)
-            print(
-                f"{upper.sqrt_price:.6f} -> {lower.sqrt_price:.6f} ({upper.tick:3} -> {lower.tick:3}) [{liquidity/10**18:.6f}]", file=sys.stderr)
             dx = delta_x(lower.sqrt_price, upper.sqrt_price, liquidity)
             dy = delta_y(lower.sqrt_price, upper.sqrt_price, liquidity)
             pstar_guess_sqrt = (
                 (sum_y + dy) / (sum_x + dx + total_compensation_amount)
             ).sqrt()
-            print(
-                f"  pstar_guess_sqrt: {pstar_guess_sqrt:.6f}", file=sys.stderr)
-            print(f"  dx: {dx/10**18:.6f}", file=sys.stderr)
-            print(f"  dy: {dy/10**18:.6f}", file=sys.stderr)
 
             # within range
             if pstar_guess_sqrt >= lower.sqrt_price:
@@ -339,10 +335,6 @@ def main():
 
     raw_positions = bytes.fromhex(sys.argv[2].removeprefix("0x"))
     positions = decode_positions(raw_positions)
-    print("Positions:", file=sys.stderr)
-    for position in positions:
-        print(
-            f"  [{position.tick_lower:3}, {position.tick_upper:3}] {position.liquidity/1e18:10,.2f}", file=sys.stderr)
 
     start_sqrt_price = from_X96(int(sys.argv[3]))
     end_sqrt_price = from_X96(int(sys.argv[4]))
@@ -359,13 +351,20 @@ def main():
     compensation_price, tick_rewards = distribute_rewards_ranges(
         direction_zero_for_one, tick_state, start, end, total_compensation_amount
     )
+    print(f'tick_rewards: {tick_rewards}', file=sys.stderr)
 
     position_rewards = [
         round(tick_state.get_reward_share(position, tick_rewards)) for position in positions
     ]
+    print("Positions:", file=sys.stderr)
+
+    for position, reward in zip(positions, position_rewards):
+        print(
+            f"  [{position.tick_lower:3}, {position.tick_upper:3}] {position.liquidity/1e18:10,.2f} {reward/1e18:10,.6f}",
+            file=sys.stderr
+        )
 
     print(f"position_rewards: {position_rewards}", file=sys.stderr)
-    print(f"positions: {positions}", file=sys.stderr)
     print(f"pstar sqrt: {compensation_price.sqrt()}", file=sys.stderr)
 
     pstar_sqrt_X96 = round(compensation_price.sqrt() * 2**96)
