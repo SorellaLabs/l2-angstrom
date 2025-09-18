@@ -1003,12 +1003,8 @@ contract AngstromL2Test is BaseTest {
         // The PoolManager wraps the hook's revert in a WrappedError
         // Test that we get the correct wrapped error
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CustomRevert.WrappedError.selector,
-                address(angstrom), // target
-                IHooks.beforeInitialize.selector, // beforeInitialize selector
-                abi.encodePacked(Ownable.Unauthorized.selector), // reason as bytes
-                abi.encodePacked(Hooks.HookCallFailed.selector) // additional context
+            uniswapWrapperErrorBytes(
+                IHooks.beforeInitialize.selector, bytes.concat(Ownable.Unauthorized.selector)
             )
         );
         manager.initialize(key, INIT_SQRT_PRICE);
@@ -1047,5 +1043,19 @@ contract AngstromL2Test is BaseTest {
         vm.prank(hookOwner);
         vm.expectRevert(AngstromL2.IncompatiblePoolConfiguration.selector);
         angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
+    }
+
+    function uniswapWrapperErrorBytes(bytes4 selector, bytes memory angstromError)
+        internal
+        view
+        returns (bytes memory)
+    {
+        return abi.encodeWithSelector(
+            CustomRevert.WrappedError.selector,
+            address(angstrom),
+            selector,
+            angstromError,
+            abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+        );
     }
 }
