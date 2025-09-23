@@ -1,23 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
+import {BaseTest} from "test/_helpers/BaseTest.sol";
 import {Math512Lib} from "src/libraries/Math512Lib.sol";
 
-contract Math512LibTest is Test {
-    function test_fuzzing_ffi_div512by256(uint256 x1, uint256 x0, uint256 d) public {
-        d = bound(d, 1, type(uint256).max);
-        (uint256 y1, uint256 y0) = pythonDiv512by256(x1, x0, d);
-        (uint256 z1, uint256 z0) = Math512Lib.div512by256(x1, x0, d);
-        assertEq(y1, z1, "y1 != z1");
-        assertEq(y0, z0, "y0 != z0");
-    }
-
-    function test_fuzzing_ffi_sqrt512(uint256 x1, uint256 x0) public {
-        uint256 root = Math512Lib.sqrt512(x1, x0);
-        assertEq(pythonSqrt512(x1, x0), root);
-    }
-
+contract Math512LibTest is BaseTest {
     function pythonDiv512by256(uint256 x1, uint256 x0, uint256 d)
         internal
         returns (uint256 y1, uint256 y0)
@@ -63,5 +50,18 @@ contract Math512LibTest is Test {
             mcopy(add(result, 0x20), add(pythonResultBytes, 0x21), sub(mload(pythonResultBytes), 1))
             mstore(0x40, add(result, sub(mload(pythonResultBytes), 1)))
         }
+    }
+
+    function test_fuzzing_ffi_div512by256(uint256 x1, uint256 x0, uint256 d) public {
+        d = bound(d, 1, type(uint256).max);
+        (uint256 y1, uint256 y0) = pythonDiv512by256(x1, x0, d);
+        (uint256 z1, uint256 z0) = Math512Lib.div512by256(x1, x0, d);
+        assertEq(y1, z1, "y1 != z1");
+        assertEq(y0, z0, "y0 != z0");
+    }
+
+    function test_fuzzing_ffi_sqrt512(uint256 x1, uint256 x0) public {
+        uint256 root = Math512Lib.sqrt512(x1, x0);
+        assertEq(pythonSqrt512(x1, x0), root);
     }
 }

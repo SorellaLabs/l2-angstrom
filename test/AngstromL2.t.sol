@@ -31,7 +31,6 @@ import {Q96MathLib} from "../src/libraries/Q96MathLib.sol";
 import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 import {X96FormatLib} from "test/_helpers/X96FormatLib.sol";
-import {StdStyle} from "forge-std/StdStyle.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2Test is BaseTest {
@@ -85,36 +84,6 @@ contract AngstromL2Test is BaseTest {
         );
 
         angstrom = factory.deployNewHook(hookOwner, salt);
-    }
-
-    function checkFfiEnabled() internal returns (bool) {
-        string[] memory inputs = new string[](1);
-        inputs[0] = "ls";
-        try vm.ffi(inputs) returns (bytes memory) {
-            return true;
-        } catch (bytes memory err) {
-            if (
-                keccak256(err)
-                    == keccak256(
-                        abi.encodeWithSignature(
-                            "CheatcodeError(string)",
-                            "vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
-                        )
-                    )
-            ) {
-                console.log(
-                    StdStyle.yellow(
-                        StdStyle.bold(
-                            "WARNING: FFI is disabled; add the `--ffi` flag to run the full test"
-                        )
-                    )
-                );
-                return false;
-            }
-            assembly ("memory-safe") {
-                revert(add(err, 0x20), mload(err))
-            }
-        }
     }
 
     function ffiPythonGetCompensation(
@@ -174,14 +143,15 @@ contract AngstromL2Test is BaseTest {
         PoolKey memory key,
         int24 tickLower,
         int24 tickUpper,
-        uint128 liquidityAmount
+        uint128 liquidityAmount,
+        bytes32 salt
     ) internal returns (BalanceDelta delta) {
         require(tickLower % key.tickSpacing == 0, "Lower tick not aligned");
         require(tickUpper % key.tickSpacing == 0, "Upper tick not aligned");
         require(tickLower < tickUpper, "Invalid tick range");
 
         (delta,) = router.modifyLiquidity(
-            key, tickLower, tickUpper, int256(uint256(liquidityAmount)), bytes32(0)
+            key, tickLower, tickUpper, int256(uint256(liquidityAmount)), salt
         );
 
         // console.log("delta.amount0(): %s", delta.amount0().fmtD());
@@ -191,6 +161,15 @@ contract AngstromL2Test is BaseTest {
             Position({tickLower: tickLower, tickUpper: tickUpper, liquidity: liquidityAmount})
         );
         return delta;
+    }
+
+    function addLiquidity(
+        PoolKey memory key,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidityAmount
+    ) internal returns (BalanceDelta delta) {
+        return addLiquidity(key, tickLower, tickUpper, liquidityAmount, bytes32(0));
     }
 
     function getRewards(PoolKey memory key, int24 tickLower, int24 tickUpper)
@@ -248,10 +227,6 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
 
-        if (!checkFfiEnabled()) {
-            return;
-        }
-
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
         for (uint256 i = 0; i < positionRewards.length; i++) {
@@ -296,10 +271,6 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
 
-        if (!checkFfiEnabled()) {
-            return;
-        }
-
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
         for (uint256 i = 0; i < positionRewards.length; i++) {
@@ -335,10 +306,6 @@ contract AngstromL2Test is BaseTest {
             10,
             "wrong tax total"
         );
-
-        if (!checkFfiEnabled()) {
-            return;
-        }
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -377,10 +344,6 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
 
-        if (!checkFfiEnabled()) {
-            return;
-        }
-
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
         for (uint256 i = 0; i < positionRewards.length; i++) {
@@ -417,10 +380,6 @@ contract AngstromL2Test is BaseTest {
             10,
             "wrong tax total"
         );
-
-        if (!checkFfiEnabled()) {
-            return;
-        }
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -469,10 +428,6 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
 
-        if (!checkFfiEnabled()) {
-            return;
-        }
-
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
         );
@@ -508,10 +463,6 @@ contract AngstromL2Test is BaseTest {
             10,
             "wrong tax total"
         );
-
-        if (!checkFfiEnabled()) {
-            return;
-        }
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -549,10 +500,6 @@ contract AngstromL2Test is BaseTest {
             "wrong tax total"
         );
 
-        if (!checkFfiEnabled()) {
-            return;
-        }
-
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
         );
@@ -588,10 +535,6 @@ contract AngstromL2Test is BaseTest {
             10,
             "wrong tax total"
         );
-
-        if (!checkFfiEnabled()) {
-            return;
-        }
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -629,10 +572,6 @@ contract AngstromL2Test is BaseTest {
             10,
             "wrong tax total"
         );
-
-        if (!checkFfiEnabled()) {
-            return;
-        }
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
