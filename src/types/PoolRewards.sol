@@ -35,44 +35,12 @@ library PoolRewardsLib {
         PoolRewards storage self,
         IPoolManager pm,
         PoolId id,
-        int24 tickSpacing,
         address sender,
         ModifyLiquidityParams calldata params
     ) internal {
-        uint256 growthInside;
-        {
-            int24 currentTick = pm.getSlot0(id).tick();
-            uint256 lowerGrowthX128 = self.rewardGrowthOutsideX128[params.tickLower];
-            uint256 upperGrowthX128 = self.rewardGrowthOutsideX128[params.tickUpper];
-
-            if (currentTick < params.tickLower) {
-                unchecked {
-                    growthInside = lowerGrowthX128 - upperGrowthX128;
-                }
-            } else if (params.tickUpper <= currentTick) {
-                // Following Uniswap's convention, if tick is below and uninitialized initialize growth
-                // outside to global accumulator.
-                if (!pm.isInitialized(id, params.tickLower, tickSpacing)) {
-                    self.rewardGrowthOutsideX128[params.tickLower] =
-                        lowerGrowthX128 = self.globalGrowthX128;
-                }
-                if (!pm.isInitialized(id, params.tickUpper, tickSpacing)) {
-                    self.rewardGrowthOutsideX128[params.tickUpper] =
-                        upperGrowthX128 = self.globalGrowthX128;
-                }
-                unchecked {
-                    growthInside = upperGrowthX128 - lowerGrowthX128;
-                }
-            } else {
-                if (!pm.isInitialized(id, params.tickLower, tickSpacing)) {
-                    self.rewardGrowthOutsideX128[params.tickLower] =
-                        lowerGrowthX128 = self.globalGrowthX128;
-                }
-                unchecked {
-                    growthInside = self.globalGrowthX128 - lowerGrowthX128 - upperGrowthX128;
-                }
-            }
-        }
+        int24 currentTick = pm.getSlot0(id).tick();
+        uint256 growthInside =
+            self.getGrowthInsideX128(currentTick, params.tickLower, params.tickUpper);
 
         (Position storage position, bytes32 positionKey) =
             self.getPosition(sender, params.tickLower, params.tickUpper, params.salt);

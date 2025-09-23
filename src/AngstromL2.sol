@@ -200,7 +200,7 @@ contract AngstromL2 is
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
-        rewards[id].updateAfterLiquidityAdd(UNI_V4, id, key.tickSpacing, sender, params);
+        rewards[id].updateAfterLiquidityAdd(UNI_V4, id, sender, params);
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax

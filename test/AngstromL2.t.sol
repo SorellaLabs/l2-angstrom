@@ -984,6 +984,27 @@ contract AngstromL2Test is BaseTest {
         angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
     }
 
+    function test_maintainsRewardsAfterSwap() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+
+        setupSimpleOneForZeroPositions(key);
+
+        uint256 priorityFee = 0.7 gwei;
+        setPriorityFee(priorityFee);
+        router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
+
+        setPriorityFee(0);
+        router.swap(key, true, 100_000_000e18, int24(14).getSqrtPriceAtTick());
+
+        assertEq(getRewards(key, -20, 10), 0.002678335827005454e18, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(key, 0, 20), 0.000622065968438472e18, "wrong rewards for [0, 20]");
+        assertEq(getRewards(key, 10, 20), 0.000129598204556072e18, "wrong rewards for [10, 20]");
+        assertEq(getRewards(key, 30, 40), 0, "wrong rewards for [30, 40]");
+
+        addLiquidity(key, -20, 40, 3e21);
+        assertEq(getRewards(key, -20, 40), 0, "rewards for [-20, 40]");
+    }
+
     function uniswapWrapperErrorBytes(bytes4 selector, bytes memory angstromError)
         internal
         view
