@@ -185,7 +185,7 @@ library CompensationPriceFinder {
         // sumX: `Xhat + B`
         uint256 sumX = sumUpToThisRange0 + compensationAmount0;
         (uint256 d1, uint256 d0) = Math512Lib.fullMul(rangeVirtualReserves1, sumX);
-        if (sumX >= rangeVirtualReserves0) {
+        if (sumX > rangeVirtualReserves0) {
             // `A` is positive, compute `D = y * (Xhat + B) + A * Yhat`, `p* = (-L + sqrt(D)) / A`.
             uint256 a = sumX - rangeVirtualReserves0;
             {
@@ -201,7 +201,7 @@ library CompensationPriceFinder {
             assert(upperBits == 0);
 
             return p1.toUint160();
-        } else {
+        } else if (sumX < rangeVirtualReserves0) {
             // `A` is negative, compute `D = y * (Xhat + B) - (-A) * Yhat`, `p* = (L - sqrt(D)) / -A`.
             uint256 negA = rangeVirtualReserves0 - sumX;
             {
@@ -217,6 +217,13 @@ library CompensationPriceFinder {
             assert(upperBits == 0);
 
             return p1.toUint160();
+        } else {
+            // `A` is zero, compute solution to linear equation.
+            // `0 = 2Ls - (Yhat + y)` <> `s = (Yhat + y) / 2L`.
+
+            return (sumUpToThisRange1 + rangeVirtualReserves1).fullMulDiv(
+                1 << (Q96MathLib.RESOLUTION - 1), liquidity
+            ).toUint160();
         }
     }
 
