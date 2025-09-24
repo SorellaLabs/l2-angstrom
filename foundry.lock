@@ -11,8 +11,11 @@
       "rev": "acd959aa4bd04720d640bf4e6a5c71037510cc4b"
     }
   },
+  "lib/solmate": {
+    "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+  },
   "lib/super-sol": {
-    "rev": "0a5cf91303aa6e36bca82487fd236ccc1d17c141"
+    "rev": "f2cb47f6da4957f8711444b7ef6dea0e1a24ac4f"
   },
   "lib/transient-goodies": {
     "rev": "bc54829dcfbe561f3222a404f35e3cc462693603"
