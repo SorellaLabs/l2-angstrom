@@ -28,6 +28,10 @@ using TickIteratorLib for TickIteratorDown global;
 using TickIteratorLib for TickIteratorUp global;
 
 /// @author philogy <https://github.com/philogy>
+/// @dev The invariant of the tick iterators is that given a `start -> end` range the iterator
+/// yields every initialized tick between start & end inclusive such that if you start with the
+/// total liquidity at `start` and apply the `netLiquidity` of every yielded tick you derive the
+/// total liquidity at `end`.
 library TickIteratorLib {
     using TickLib for int24;
     using TickLib for uint256;
@@ -119,8 +123,8 @@ library TickIteratorLib {
     /// @param manager The pool manager contract
     /// @param poolId The ID of the pool to iterate
     /// @param tickSpacing The tick spacing of the pool
-    /// @param startTick The starting tick (exclusive, should be higher)
-    /// @param endTick The ending tick (exclusive, should be lower)
+    /// @param startTick The starting tick (inclusive, should be higher or equal to `endTick`)
+    /// @param endTick The ending tick (exclusive, should be lower or equal to `startTick`)
     /// @return self The initialized iterator
     function initDown(
         IPoolManager manager,
@@ -140,7 +144,10 @@ library TickIteratorLib {
 
     function reset(TickIteratorDown memory self, int24 startTick) internal view {
         if (!(self.endTick <= startTick)) revert InvalidRange();
-        self.currentTick = startTick;
+        // We want the tick iterator to be *inclusive* of the start tick, however
+        // `_advanceToNextDown` searches for the next tick strictly *less than* `self.currentTick`,
+        // therefore we set it `+ 1`.
+        self.currentTick = startTick + 1;
 
         if (startTick == self.endTick) return;
 
