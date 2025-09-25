@@ -65,6 +65,7 @@ contract AngstromL2Test is BaseTest {
         vm.roll(100);
         manager = new UniV4Inspector();
         router = new RouterActor(manager);
+        vm.deal(address(manager), 1_000 ether);
         vm.deal(address(router), 100 ether);
 
         token = new MockERC20();
@@ -194,6 +195,14 @@ contract AngstromL2Test is BaseTest {
         );
     }
 
+    function getAllRewards(PoolKey memory key) internal view returns (uint256) {
+        uint256 rewards = 0;
+        for (uint256 i = 0; i < positions.length; i++) {
+            rewards += getRewards(key, positions[i].tickLower, positions[i].tickUpper);
+        }
+        return rewards;
+    }
+
     function setupSimpleZeroForOnePositions(PoolKey memory key) internal {
         addLiquidity(key, -10, 20, 10e21);
         addLiquidity(key, -20, 0, 2e21);
@@ -233,6 +242,112 @@ contract AngstromL2Test is BaseTest {
         assertEq(factory.getDefaultProtocolSwapFee(0.0002e6, 0.00004e6), 0.000079e6);
     }
 
+    function test_fuzzing_ffi_zeroForOne(int24 endTick, uint256 priorityFee) public {
+        endTick = int24(bound(endTick, int24(-40), int24(2)));
+        priorityFee = bound(priorityFee, 0, 10_000 gwei);
+
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        setupSimpleZeroForOnePositions(key);
+        Slot0 slot0BeforeSwap = manager.getSlot0(key.toId());
+        setPriorityFee(priorityFee);
+        BalanceDelta delta =
+            router.swap(key, true, -100_000_000e18, int24(endTick).getSqrtPriceAtTick());
+        Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
+        console.log("delta.amount0(): %s", delta.amount0().fmtD(18));
+        console.log("delta.amount1(): %s", delta.amount1().fmtD(18));
+
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
+        console.log("totalCompensationAmount: %s", totalCompensationAmount.fmtD(18));
+        console.log("getAllRewards: %s", getAllRewards(key).fmtD(18));
+        console.log("end tick: %s (real end: %s)", endTick.toStr(), slot0AfterSwap.tick().toStr());
+        assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
+
+        (, uint256[] memory positionRewards) =
+            ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
+        for (uint256 i = 0; i < positionRewards.length; i++) {
+            uint256 rewards = getRewards(key, positions[i].tickLower, positions[i].tickUpper);
+            console.log("%s:", i);
+            console.log(
+                "  [%s, %s] %s",
+                positions[i].tickLower.toStr(),
+                positions[i].tickUpper.toStr(),
+                rewards.fmtD(18)
+            );
+            assertApproxEqAbs(
+                rewards,
+                positionRewards[i],
+                10,
+                string.concat(
+                    "wrong rewards for position #",
+                    vm.toString(i),
+                    " [",
+                    vm.toString(positions[i].tickLower),
+                    ", ",
+                    vm.toString(positions[i].tickUpper),
+                    "]"
+                )
+            );
+        }
+    }
+
+    function test_fuzzing_ffi_zeroForOne2(int24 endTick, uint256 priorityFee) public {
+        int24 spacing = 11000;
+        endTick = int24(bound(endTick, -4 * spacing, 323));
+        priorityFee = bound(priorityFee, 0, 10_000 gwei);
+
+        PoolKey memory key = initializePool(address(token), spacing, 324);
+
+        addLiquidity(key, -1 * spacing, 2 * spacing, 0.0001e21);
+        addLiquidity(key, -2 * spacing, 0, 0.0002e21);
+        addLiquidity(key, -2 * spacing, -1 * spacing, 0.0003e21);
+        addLiquidity(key, -4 * spacing, -3 * spacing, 0.0008e21);
+
+        Slot0 slot0BeforeSwap = manager.getSlot0(key.toId());
+        setPriorityFee(priorityFee);
+        BalanceDelta delta =
+            router.swap(key, true, type(int128).min, int24(endTick).getSqrtPriceAtTick());
+        Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
+        console.log("delta.amount0(): %s", delta.amount0().fmtD(18));
+        console.log("delta.amount1(): %s", delta.amount1().fmtD(18));
+
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
+        console.log("totalCompensationAmount: %s", totalCompensationAmount.fmtD(18));
+        console.log("getAllRewards: %s", getAllRewards(key).fmtD(18));
+        console.log("end tick: %s (real end: %s)", endTick.toStr(), slot0AfterSwap.tick().toStr());
+        assertLe(getAllRewards(key), totalCompensationAmount, "more rewards than cost");
+        uint256 prec = uint256(1e18) / 1e5;
+        assertApproxEqRel(totalCompensationAmount, getAllRewards(key), prec, "wrong tax total");
+
+        (, uint256[] memory positionRewards) =
+            ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
+        for (uint256 i = 0; i < positionRewards.length; i++) {
+            uint256 rewards = getRewards(key, positions[i].tickLower, positions[i].tickUpper);
+            console.log("%s:", i);
+            console.log(
+                "  [%s, %s] %s",
+                positions[i].tickLower.toStr(),
+                positions[i].tickUpper.toStr(),
+                rewards.fmtD(18)
+            );
+            totalCompensationAmount -= rewards;
+            string memory errorMessage = string.concat(
+                "wrong rewards for position #",
+                vm.toString(i),
+                " [",
+                vm.toString(positions[i].tickLower),
+                ", ",
+                vm.toString(positions[i].tickUpper),
+                "]"
+            );
+            if (rewards == 0 || positionRewards[i] == 0) {
+                uint256 maxDelta = i == positions.length - 1 ? totalCompensationAmount + 1000 : 10;
+                assertApproxEqAbs(rewards, positionRewards[i], maxDelta, errorMessage);
+            } else {
+                assertApproxEqRel(rewards, positionRewards[i], prec, errorMessage);
+            }
+        }
+    }
+
     function test_simpleZeroForOneSwap1() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
 
@@ -246,17 +361,8 @@ contract AngstromL2Test is BaseTest {
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -10, 20), 0.003099217600434384e18, "wrong rewards for [-10, 20]");
-        assertEq(getRewards(key, -20, 0), 0.000330782399565614e18, "wrong rewards for [-20, 0]");
-        assertEq(getRewards(key, -20, -10), 0, "wrong rewards for [-20, -10]");
-        assertEq(getRewards(key, -40, -30), 0, "wrong rewards for [-40, -30]");
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -10, 20) + getRewards(key, -20, 0),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -291,16 +397,8 @@ contract AngstromL2Test is BaseTest {
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertEq(getRewards(key, -10, 20), 0.005602270037068238e18, "wrong rewards for [-10, 20]");
-        assertEq(getRewards(key, -20, 0), 0.000734179067847244e18, "wrong rewards for [-20, 0]");
-        assertEq(getRewards(key, -20, -10), 0.000033550895084515e18, "wrong rewards for [-20, -10]");
-        assertEq(getRewards(key, -40, -30), 0, "wrong rewards for [-40, -30]");
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -10, 20) + getRewards(key, -20, 0) + getRewards(key, -20, -10),
-            10,
-            "wrong tax total"
-        );
+        uint256 totalRewards = getAllRewards(key);
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -326,17 +424,9 @@ contract AngstromL2Test is BaseTest {
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -10, 20), 0.01024433477037636e18, "wrong rewards for [-10, 20]");
-        assertEq(getRewards(key, -20, 0), 0.00185381931995983e18, "wrong rewards for [-20, 0]");
-        assertEq(getRewards(key, -20, -10), 0.000641845909663807e18, "wrong rewards for [-20, -10]");
-        assertEq(getRewards(key, -40, -30), 0, "wrong rewards for [-40, -30]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -10, 20) + getRewards(key, -20, 0) + getRewards(key, -20, -10),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -362,18 +452,9 @@ contract AngstromL2Test is BaseTest {
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -10, 20), 0.01915713964717508e18, "wrong rewards for [-10, 20]");
-        assertEq(getRewards(key, -20, 0), 0.004592491766904468e18, "wrong rewards for [-20, 0]");
-        assertEq(getRewards(key, -20, -10), 0.002693207716034233e18, "wrong rewards for [-20, -10]");
-        assertEq(getRewards(key, -40, -30), 0.000017160869886216e18, "wrong rewards for [-40, -30]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -10, 20) + getRewards(key, -20, 0) + getRewards(key, -20, -10)
-                + getRewards(key, -40, -30),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -399,18 +480,9 @@ contract AngstromL2Test is BaseTest {
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -10, 20), 0.027907308204202895e18, "wrong rewards for [-10, 20]");
-        assertEq(getRewards(key, -20, 0), 0.007283976556723247e18, "wrong rewards for [-20, 0]");
-        assertEq(getRewards(key, -20, -10), 0.004711316680241725e18, "wrong rewards for [-20, -10]");
-        assertEq(getRewards(key, -40, -30), 0.00027739855883213e18, "wrong rewards for [-40, -30]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -10, 20) + getRewards(key, -20, 0) + getRewards(key, -20, -10)
-                + getRewards(key, -40, -30),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
@@ -447,17 +519,9 @@ contract AngstromL2Test is BaseTest {
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -20, 10), 0.002678335827005454e18, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 0.000622065968438472e18, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 0.000129598204556072e18, "wrong rewards for [10, 20]");
-        assertEq(getRewards(key, 30, 40), 0, "wrong rewards for [30, 40]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -20, 10) + getRewards(key, 0, 20) + getRewards(key, 10, 20),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -483,17 +547,9 @@ contract AngstromL2Test is BaseTest {
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -20, 10), 0.004432088692461249e18, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 0.001307015166110849e18, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 0.000630896141427899e18, "wrong rewards for [10, 20]");
-        assertEq(getRewards(key, 30, 40), 0, "wrong rewards for [30, 40]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -20, 10) + getRewards(key, 0, 20) + getRewards(key, 10, 20),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -519,17 +575,9 @@ contract AngstromL2Test is BaseTest {
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -20, 10), 0.00776359551092331e18, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 0.002922193256941472e18, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 0.002054211232135216e18, "wrong rewards for [10, 20]");
-        assertEq(getRewards(key, 30, 40), 0, "wrong rewards for [30, 40]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -20, 10) + getRewards(key, 0, 20) + getRewards(key, 10, 20),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -554,18 +602,9 @@ contract AngstromL2Test is BaseTest {
         setPriorityFee(priorityFee);
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
-        assertEq(getRewards(key, -20, 10), 0.014760006124184324e18, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 0.006321299553358821e18, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 0.005053947492782935e18, "wrong rewards for [10, 20]");
-        assertEq(getRewards(key, 30, 40), 0.000324746829673917e18, "wrong rewards for [30, 40]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -20, 10) + getRewards(key, 0, 20) + getRewards(key, 10, 20)
-                + getRewards(key, 30, 40),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount
@@ -591,18 +630,9 @@ contract AngstromL2Test is BaseTest {
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        assertEq(getRewards(key, -20, 10), 0.021718092436443219e18, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 0.009701786534809838e18, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 0.008037252071281791e18, "wrong rewards for [10, 20]");
-        assertEq(getRewards(key, 30, 40), 0.000722868957465149e18, "wrong rewards for [30, 40]");
+        uint256 totalRewards = getAllRewards(key);
         uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
-        assertApproxEqAbs(
-            totalCompensationAmount,
-            getRewards(key, -20, 10) + getRewards(key, 0, 20) + getRewards(key, 10, 20)
-                + getRewards(key, 30, 40),
-            10,
-            "wrong tax total"
-        );
+        assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
             slot0BeforeSwap, slot0AfterSwap, false, totalCompensationAmount

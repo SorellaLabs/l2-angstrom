@@ -45,21 +45,19 @@ library CompensationPriceFinder {
                 sumAmount0Deltas += delta0;
                 sumAmount1Deltas += delta1;
 
-                if (sumAmount0Deltas > taxInEther) {
-                    if (
-                        sumAmount1Deltas.divX96(sumAmount0Deltas + taxInEther)
-                            >= uint256(priceLowerSqrtX96).mulX96(priceLowerSqrtX96)
-                    ) {
-                        pstarSqrtX96 = _zeroForOneGetFinalCompensationPrice(
-                            priceUpperSqrtX96,
-                            taxInEther,
-                            liquidity,
-                            sumAmount0Deltas - delta0,
-                            sumAmount1Deltas - delta1
-                        );
+                if (
+                    sumAmount1Deltas.divX96(sumAmount0Deltas + taxInEther)
+                        >= uint256(priceLowerSqrtX96).mulX96(priceLowerSqrtX96)
+                ) {
+                    pstarSqrtX96 = _zeroForOneGetFinalCompensationPrice(
+                        priceUpperSqrtX96,
+                        taxInEther,
+                        liquidity,
+                        sumAmount0Deltas - delta0,
+                        sumAmount1Deltas - delta1
+                    );
 
-                        return (lastTick, pstarSqrtX96);
-                    }
+                    return (lastTick, pstarSqrtX96);
                 }
             }
 

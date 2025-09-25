@@ -176,7 +176,9 @@ contract RouterActor is IUnlockCallback {
             if (amount < 0) {
                 uniV4.sync(currency);
                 if (currency.isAddressZero()) {
-                    uniV4.settle{value: uint128(-amount)}();
+                    uint256 value = uint128(-amount);
+                    console.log("settle value: %s", value.fmtD(18));
+                    uniV4.settle{value: value}();
                 } else {
                     currency.transfer(address(uniV4), uint128(-amount));
                     uniV4.settle();

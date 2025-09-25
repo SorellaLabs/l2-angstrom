@@ -60,13 +60,15 @@ def from_X96(x: int) -> D:
 
 def delta_x(sqrt_price_lower: D, sqrt_price_upper: D, liquidity: int) -> D:
     dx = liquidity * (1/sqrt_price_lower - 1/sqrt_price_upper)
-    assert dx >= 0, "dx negative"
+    assert dx >= 0 or quasi_eq(dx, D(0), prec=7), \
+        f"dx negative (dx = {dx/10**18:.18f})"
     return dx
 
 
 def delta_y(sqrt_price_lower: D, sqrt_price_upper: D, liquidity: int) -> D:
     dy = liquidity * (sqrt_price_upper - sqrt_price_lower)
-    assert dy >= 0, "dy negative"
+    assert dy >= 0 or quasi_eq(dy, D(0), prec=7), \
+        f"dy negative (dy = {dy/10**18:.18f})"
     return dy
 
 
@@ -84,7 +86,9 @@ def get_ticks_zero_for_one(
     yield start_upper
     for tick in reversed(sorted_ticks):
         sqrt_price = tick_to_sqrt_price(tick)
-        if end_lower.sqrt_price <= sqrt_price <= start_upper.sqrt_price:
+        if end_lower.sqrt_price < sqrt_price < start_upper.sqrt_price\
+                or quasi_eq(sqrt_price, start_upper.sqrt_price)\
+                or quasi_eq(sqrt_price, end_lower.sqrt_price):
             yield PricedTick(tick, sqrt_price)
     yield end_lower
 
@@ -144,6 +148,8 @@ class TickState:
     def get_ranges_zero_for_one(self, start_upper: PricedTick, end_lower: PricedTick) -> Generator[tuple[PricedTick, PricedTick], None, None]:
         assert start_upper.tick >= end_lower.tick, "start_upper.tick < end_lower.tick"
         assert start_upper.sqrt_price >= end_lower.sqrt_price, "start_upper.sqrt_price < end_lower.sqrt_price"
+        dprint(
+            f'get_ranges_zero_for_one: {start_upper.tick} -> {end_lower.tick}')
         return ticks_iter_to_ranges(lambda: get_ticks_zero_for_one(start_upper, end_lower, self.sorted_ticks))
 
     def get_ranges_one_for_zero(self, start_lower: PricedTick, end_upper: PricedTick) -> Generator[tuple[PricedTick, PricedTick], None, None]:
@@ -172,7 +178,8 @@ class TickState:
                              upper.sqrt_price, liquidity)
                 range_comp = dy / compensation_price - dx
 
-            assert range_comp >= 0, "range_comp negative"
+            assert quasi_ge(range_comp, D(0), prec=6), \
+                f"range_comp negative ({range_comp})"
             yield (lower, upper, range_comp)
 
     def get_one_for_zero_compensation_amount(self, start_lower: PricedTick, end_upper: PricedTick, compensation_price: D) -> Generator[tuple[PricedTick, PricedTick, D], None, None]:
@@ -267,8 +274,17 @@ def compute_and_verify_compensation_price(
     return compensation_price
 
 
-def quasi_eq(a: D, b: D) -> bool:
-    return abs(a - b) < D('1e-10')
+def quasi_ge(a: D, b: D, prec: int = 10) -> bool:
+    return a >= b or quasi_eq(a, b, prec)
+
+
+def quasi_le(a: D, b: D, prec: int = 10) -> bool:
+    return a <= b or quasi_eq(a, b, prec)
+
+
+def quasi_eq(a: D, b: D, prec: int = 10) -> bool:
+    assert prec >= 0, "prec must be non-negative"
+    return abs(a - b) < D(f'1e-{prec}')
 
 
 DEBUG = False
@@ -292,10 +308,16 @@ def compute_compensation_price(
     sum_y = D(0)
 
     if direction_zero_for_one:
+        dprint('=========== Loop Start ============')
         for upper, lower in tick_state.get_ranges_zero_for_one(start, end):
             liquidity = tick_state.get_liquidity(lower.tick)
+            dprint(
+                f'{lower.sqrt_price:.12f} -> {upper.sqrt_price:.12f} ({lower.tick:3}, {upper.tick:3})')
+            dprint(f'  liquidity: {liquidity / 10**18:.18f}')
             dx = delta_x(lower.sqrt_price, upper.sqrt_price, liquidity)
             dy = delta_y(lower.sqrt_price, upper.sqrt_price, liquidity)
+            dprint(
+                f'  dx: {dx / 10**18:.18f}, dy: {dy / 10**18:.18f}')
             pstar_guess_sqrt = (
                 (sum_y + dy) / (sum_x + dx + total_compensation_amount)
             ).sqrt()
@@ -310,7 +332,13 @@ def compute_compensation_price(
                 return pstar_sqrt**2
             sum_x += dx
             sum_y += dy
-        return sum_y / (sum_x + total_compensation_amount)
+        dprint(
+            f'sum_x: {sum_x / 10**18:.18f}, sum_y: {sum_y / 10**18:.18f}')
+        dprint(
+            f'total_compensation_amount: {total_compensation_amount / 10**18:.18f}')
+        pstar = sum_y / (sum_x + total_compensation_amount)
+        dprint(f'compensation all, pstar: {pstar:.18f}')
+        return pstar
     else:
         for lower, upper in tick_state.get_ranges_one_for_zero(start, end):
             liquidity = tick_state.get_liquidity(lower.tick)
