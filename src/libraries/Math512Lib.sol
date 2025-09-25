@@ -95,7 +95,7 @@ library Math512Lib {
             last = root;
             // The above invariant lets us safely discard the upper bits of the result. This is
             // because our guess always starts at or above the correct result and monotonically
-            //1 decreases towards the correct result.
+            // decreases towards the correct result.
             (, root) = div512by256(x1, x0, root);
             root = FixedPointMathLib.avg(root, last);
         } while (root < last);
