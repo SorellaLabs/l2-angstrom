@@ -54,9 +54,7 @@ contract AngstromL2 is
     using Q96MathLib for uint256;
     using SafeCastLib for *;
 
-    error NegationOverflow();
     error CreatorFeeExceedsMaximum();
-    error AttemptingToWithdrawLPRewards();
     error IncompatiblePoolConfiguration();
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
@@ -237,7 +235,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
-            UNI_V4.take(CurrencyLibrary.fromId(NATIVE_CURRENCY_ID), FACTORY, taxAmountInEther);
+            UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         if (rewardAmount0 > 0) {
             UNI_V4.burn(address(this), NATIVE_CURRENCY_ID, rewardAmount0);

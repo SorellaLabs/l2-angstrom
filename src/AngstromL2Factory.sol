@@ -86,24 +86,32 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function setDefaultProtocolSwapFeeMultiple(uint24 newDefaultProtocolSwapFeeE6) public {
         _checkOwner();
+        if (!(newDefaultProtocolSwapFeeE6 <= MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6)) {
+            revert ProtocolFeeExceedsMaximum();
+        }
         defaultProtocolSwapFeeAsMultipleE6 = newDefaultProtocolSwapFeeE6;
         emit DefaultProtocolSwapFeeE6Updated(newDefaultProtocolSwapFeeE6);
     }
 
     function setDefaultProtocolTaxFee(uint24 newDefaultProtocolTaxFeeE6) public {
         _checkOwner();
+        if (!(newDefaultProtocolTaxFeeE6 <= MAX_PROTOCOL_TAX_FEE_E6)) {
+            revert ProtocolFeeExceedsMaximum();
+        }
         defaultProtocolTaxFeeE6 = newDefaultProtocolTaxFeeE6;
         emit DefaultProtocolTaxFeeE6Updated(newDefaultProtocolTaxFeeE6);
     }
 
     function setProtocolSwapFee(AngstromL2 hook, PoolKey calldata key, uint256 newFeeE6) public {
         _checkOwner();
+        if (!(newFeeE6 <= MAX_PROTOCOL_SWAP_FEE_E6)) revert ProtocolFeeExceedsMaximum();
         hook.setProtocolSwapFee(key, newFeeE6);
         emit ProtocolSwapFeeUpdated(address(hook), key, newFeeE6);
     }
 
     function setProtocolTaxFee(AngstromL2 hook, PoolKey calldata key, uint256 newFeeE6) public {
         _checkOwner();
+        if (!(newFeeE6 <= MAX_PROTOCOL_TAX_FEE_E6)) revert ProtocolFeeExceedsMaximum();
         hook.setProtocolTaxFee(key, newFeeE6);
         emit ProtocolTaxFeeUpdated(address(hook), key, newFeeE6);
     }
