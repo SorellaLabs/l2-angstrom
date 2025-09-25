@@ -16,7 +16,6 @@ contract AngstromL2Factory is Ownable, IFactory {
     using SafeCastLib for *;
 
     error ProtocolFeeExceedsMaximum();
-    error TotalFeeAboveOneHundredPercent();
     error NotVerifiedHook();
     error FlashBlockNumberProviderAlreadySet();
 
@@ -159,12 +158,6 @@ contract AngstromL2Factory is Ownable, IFactory {
         if (protocolSwapFeeE6 > MAX_PROTOCOL_SWAP_FEE_E6) {
             protocolSwapFeeE6 = MAX_PROTOCOL_SWAP_FEE_E6;
         }
-        if (!(creatorSwapFeeE6 + protocolSwapFeeE6 <= FACTOR_E6)) {
-            revert TotalFeeAboveOneHundredPercent();
-        }
-        if (!(creatorTaxFeeE6 + protocolTaxFeeE6 <= FACTOR_E6)) {
-            revert TotalFeeAboveOneHundredPercent();
-        }
         emit PoolCreated(
             msg.sender, key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
         );
@@ -176,7 +169,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         view
         returns (uint24)
     {
-        // Solve`f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) = defaultProtocolSwapFeeAsMultipleE6` for `f_pr`.
+        // Solve `f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) = defaultProtocolSwapFeeAsMultipleE6` for `f_pr`.
         return (
             defaultProtocolSwapFeeAsMultipleE6
                 * (FACTOR_E6 * FACTOR_E6 - (FACTOR_E6 - lpFeeE6) * (FACTOR_E6 - creatorSwapFeeE6))

@@ -60,6 +60,7 @@ contract AngstromL2 is
     error IncompatiblePoolConfiguration();
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
+    error TotalFeeAboveOneHundredPercent();
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -78,7 +79,6 @@ contract AngstromL2 is
     uint256 internal constant MAX_CREATOR_SWAP_FEE_E6 = 0.2e6;
     uint256 internal constant MAX_CREATOR_TAX_FEE_E6 = 0.5e6; // 50%
 
-    // TODO: Be able to set provider.
     address public immutable FACTORY;
 
     IFlashBlockNumber internal flashBlockNumberProvider;
@@ -127,6 +127,7 @@ contract AngstromL2 is
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
         feeConfiguration.protocolSwapFeeE6 = newFeeE6.toUint24();
+        _checkFeeConfiguration(feeConfiguration);
     }
 
     function setProtocolTaxFee(PoolKey calldata key, uint256 newFeeE6) public {
@@ -134,6 +135,7 @@ contract AngstromL2 is
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
         if (!feeConfiguration.isInitialized) revert PoolNotInitialized();
         feeConfiguration.protocolTaxFeeE6 = newFeeE6.toUint24();
+        _checkFeeConfiguration(feeConfiguration);
     }
 
     function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
@@ -183,6 +185,17 @@ contract AngstromL2 is
         feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
         (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) = IFactory(FACTORY)
             .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
+        _checkFeeConfiguration(feeConfiguration);
+    }
+
+    function _checkFeeConfiguration(PoolFeeConfiguration storage feeConfiguration) internal view {
+        if (!(feeConfiguration.creatorSwapFeeE6 + feeConfiguration.protocolSwapFeeE6 <= FACTOR_E6))
+        {
+            revert TotalFeeAboveOneHundredPercent();
+        }
+        if (!(feeConfiguration.creatorTaxFeeE6 + feeConfiguration.protocolTaxFeeE6 <= FACTOR_E6)) {
+            revert TotalFeeAboveOneHundredPercent();
+        }
     }
 
     function beforeInitialize(address, PoolKey calldata, uint160) external pure returns (bytes4) {
