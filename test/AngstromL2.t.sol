@@ -118,6 +118,16 @@ contract AngstromL2Test is BaseTest {
         internal
         returns (PoolKey memory key)
     {
+        return initializePool(asset1, tickSpacing, startTick, 0, 0);
+    }
+
+    function initializePool(
+        address asset1,
+        int24 tickSpacing,
+        int24 startTick,
+        uint24 creatorSwapFeeE6,
+        uint24 creatorTaxFeeE6
+    ) internal returns (PoolKey memory key) {
         require(asset1 != address(0), "Token cannot be address(0)");
 
         key = PoolKey({
@@ -129,7 +139,9 @@ contract AngstromL2Test is BaseTest {
         });
 
         vm.prank(hookOwner);
-        angstrom.initializeNewPool(key, TickMath.getSqrtPriceAtTick(startTick), 0, 0);
+        angstrom.initializeNewPool(
+            key, TickMath.getSqrtPriceAtTick(startTick), creatorSwapFeeE6, creatorTaxFeeE6
+        );
 
         return key;
     }
@@ -192,6 +204,25 @@ contract AngstromL2Test is BaseTest {
         assertEq(getRewards(key, -20, 0), 0);
         assertEq(getRewards(key, -20, -10), 0);
         assertEq(getRewards(key, -40, -30), 0);
+    }
+
+    function test_swapWithFee() public {
+        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0);
+        vm.prank(factoryOwner);
+        factory.setProtocolSwapFee(angstrom, key, 0.03e6);
+        setupSimpleZeroForOnePositions(key);
+
+        setPriorityFee(0);
+        BalanceDelta delta =
+            router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        uint256 factoryFee = token.balanceOf(address(factory));
+        uint256 creatorFee = token.balanceOf(address(angstrom));
+
+        assertGe(delta.amount1(), 0);
+        uint256 totalOut = uint128(delta.amount1()) + factoryFee + creatorFee;
+        assertApproxEqAbs(factoryFee * 1e6 / totalOut, 0.03e6, 1);
+        assertApproxEqAbs(creatorFee * 1e6 / totalOut, 0.02e6, 1);
     }
 
     function test_factoryGetDefaultProtocolSwapFee() public {

@@ -17,4 +17,5 @@ function getRequiredHookPermissions() pure returns (Hooks.Permissions memory per
     permissions.beforeSwap = true; // To tax ToB
     permissions.afterSwap = true; // Also to tax with ToB (after swap contains reward dist. calculations)
     permissions.beforeSwapReturnDelta = true; // To charge the ToB MEV tax.
+    permissions.afterSwapReturnDelta = true; // To charge swap fee
 }
