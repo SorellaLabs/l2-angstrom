@@ -429,7 +429,7 @@ contract AngstromL2 is
         int24 lastTick,
         uint160 pstarSqrtX96
     ) internal {
-        uint256 pstarX96 = uint256(pstarSqrtX96).mulX96(pstarSqrtX96);
+        uint256 pstarX96 = uint256(pstarSqrtX96).mulX96(pstarSqrtX96).max(1);
         uint256 cumulativeGrowthX128 = 0;
         uint160 priceLowerSqrtX96;
 
@@ -437,7 +437,6 @@ contract AngstromL2 is
             int24 tickNext = ticks.getNext();
 
             priceLowerSqrtX96 = max(TickMath.getSqrtPriceAtTick(tickNext), pstarSqrtX96);
-
             uint256 rangeReward = 0;
             if (tickNext >= lastTick && liquidity != 0) {
                 uint256 delta0 = SqrtPriceMath.getAmount0Delta(
@@ -446,7 +445,8 @@ contract AngstromL2 is
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
-                rangeReward = (delta1.divX96(pstarX96) - delta0).min(lpCompensationAmount);
+                rangeReward =
+                    delta1.divX96(pstarX96).saturatingSub(delta0).min(lpCompensationAmount);
 
                 unchecked {
                     lpCompensationAmount -= rangeReward;
@@ -479,7 +479,7 @@ contract AngstromL2 is
         int24 lastTick,
         uint160 pstarSqrtX96
     ) internal {
-        uint256 pstarX96 = uint256(pstarSqrtX96).mulX96(pstarSqrtX96);
+        uint256 pstarX96 = uint256(pstarSqrtX96).mulX96(pstarSqrtX96).max(1);
         uint256 cumulativeGrowthX128 = 0;
         uint160 priceUpperSqrtX96;
 
@@ -496,7 +496,8 @@ contract AngstromL2 is
                 uint256 delta1 = SqrtPriceMath.getAmount1Delta(
                     priceLowerSqrtX96, priceUpperSqrtX96, liquidity, false
                 );
-                rangeReward = (delta0 - delta1.divX96(pstarX96)).min(lpCompensationAmount);
+                rangeReward =
+                    delta0.saturatingSub(delta1.divX96(pstarX96)).min(lpCompensationAmount);
 
                 unchecked {
                     lpCompensationAmount -= rangeReward;

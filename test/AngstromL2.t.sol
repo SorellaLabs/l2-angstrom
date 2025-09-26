@@ -215,6 +215,22 @@ contract AngstromL2Test is BaseTest {
         assertEq(getRewards(key, -40, -30), 0);
     }
 
+    function test_delta1WrongRoundingDirection() public {
+        token.mint(address(router), 1e50);
+        vm.deal(address(router), 1e50);
+
+        int24 startTick = TickMath.MIN_TICK + 400000;
+        PoolKey memory key = initializePool(address(token), 1, startTick);
+
+        for (int24 i = 0; i < 80; i++) {
+            addLiquidity(key, startTick - 10 - i * 10, startTick - i * 10, 100e18);
+        }
+
+        setPriorityFee(1 gwei);
+
+        router.swap(key, true, 1e14, TickMath.MIN_SQRT_PRICE + 1);
+    }
+
     function test_swapWithFee() public {
         PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0);
         vm.prank(factoryOwner);
