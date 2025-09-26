@@ -332,7 +332,7 @@ contract AngstromL2 is
             uint256 absTargetAmount = unspecifiedDelta.abs();
             fee = exactIn
                 ? absTargetAmount * totalSwapFeeRateE6 / FACTOR_E6
-                : absTargetAmount * FACTOR_E6 / (FACTOR_E6 - totalSwapFeeRateE6) - absTargetAmount;
+                : absTargetAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
 
             // Determine protocol/creator split
             creatorSwapFeeAmount = fee * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6;
