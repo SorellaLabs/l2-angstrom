@@ -232,7 +232,7 @@ contract AngstromL2 is
 
         PoolId id = key.calldataToId();
         uint256 rewardAmount0 = rewards[id].updateAfterLiquidityRemove(UNI_V4, id, sender, params);
-        uint256 taxAmountInEther = _getJitTaxAmount();
+        uint256 taxAmountInEther = params.liquidityDelta == 0 ? 0 : _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
