@@ -215,7 +215,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
-            UNI_V4.take(CurrencyLibrary.fromId(NATIVE_CURRENCY_ID), FACTORY, taxAmountInEther);
+            UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         return (this.afterAddLiquidity.selector, toBalanceDelta(taxAmountInEther.toInt128(), 0));
     }
