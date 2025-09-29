@@ -30,7 +30,6 @@ library CompensationPriceFinder {
         uint256 sumAmount0Deltas = 0; // \hat X
         uint256 sumAmount1Deltas = 0; // \hat Y
 
-
         uint160 priceLowerSqrtX96;
         while (ticks.hasNext()) {
             lastTick = ticks.getNext();
