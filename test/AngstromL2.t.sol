@@ -25,7 +25,6 @@ import {Ownable} from "solady/src/auth/Ownable.sol";
 import {CustomRevert} from "v4-core/src/libraries/CustomRevert.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
 import {IHookAddressMiner} from "../src/interfaces/IHookAddressMiner.sol";
-import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
 
 import {Q96MathLib} from "../src/libraries/Q96MathLib.sol";
 import {console} from "forge-std/console.sol";
@@ -71,15 +70,12 @@ contract AngstromL2Test is BaseTest {
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
 
-        factory = new AngstromL2Factory(
-            factoryOwner, manager, IFlashBlockNumber(address(0)), IHookAddressMiner(address(0))
-        );
+        factory = new AngstromL2Factory(factoryOwner, manager, IHookAddressMiner(address(0)));
 
         bytes32 salt = mineAngstromL2Salt(
             address(factory),
             type(AngstromL2).creationCode,
             manager,
-            IFlashBlockNumber(address(0)),
             hookOwner,
             getRequiredHookPermissions()
         );

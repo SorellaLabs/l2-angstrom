@@ -14,7 +14,6 @@ import {
     IAfterRemoveLiquidityHook,
     IBeforeInitializeHook
 } from "./interfaces/IHooks.sol";
-import {IFlashBlockNumber} from "./interfaces/IFlashBlockNumber.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {BalanceDelta, toBalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
@@ -69,7 +68,8 @@ contract AngstromL2 is
     uint256 constant SWAP_MEV_TAX_FACTOR = 49;
     /// @dev Parameters for taxing just-in-time (JIT) liquidity
     uint256 internal constant JIT_TAXED_GAS = 100_000;
-    uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 4;
+    /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
+    uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 3 / 2;
 
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
@@ -79,8 +79,6 @@ contract AngstromL2 is
 
     address public immutable FACTORY;
 
-    IFlashBlockNumber internal flashBlockNumberProvider;
-    uint96 internal _blockOfLastTopOfBlock;
     mapping(PoolId id => PoolRewards) internal rewards;
 
     struct PoolFeeConfiguration {
@@ -98,22 +96,13 @@ contract AngstromL2 is
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
-    constructor(
-        IPoolManager uniV4,
-        IFlashBlockNumber initialFlashBlockNumberProvider,
-        address owner
-    ) UniConsumer(uniV4) /* Ownable() */ {
+    constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) /* Ownable() */ {
         _initializeOwner(owner);
         FACTORY = msg.sender;
         Hooks.validateHookPermissions(IHooks(address(this)), getRequiredHookPermissions());
-        flashBlockNumberProvider = initialFlashBlockNumberProvider;
     }
 
     receive() external payable {}
-
-    function syncFlashBlockNumberProvider() public {
-        flashBlockNumberProvider = IFactory(FACTORY).flashBlockNumberProvider();
-    }
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
@@ -256,10 +245,6 @@ contract AngstromL2 is
         PoolId id = key.calldataToId();
         slot0BeforeSwapStore.set(Slot0.unwrap(UNI_V4.getSlot0(id)));
 
-        if (_getBlock() == _blockOfLastTopOfBlock) {
-            return (this.beforeSwap.selector, toBeforeSwapDelta(0, 0), 0);
-        }
-
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
         int128 etherDelta = _getSwapTaxAmount().toInt128();
 
@@ -281,11 +266,8 @@ contract AngstromL2 is
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
-        uint96 blockNumber = _getBlock();
-        bool isTopOfBlock = blockNumber != _blockOfLastTopOfBlock;
-        (uint256 feeInUnspecified, uint256 lpCompensationAmount) = _computeAndCollectProtocolSwapFee(
-            key, id, params, swapDelta, isTopOfBlock ? _getSwapTaxAmount() : 0
-        );
+        (uint256 feeInUnspecified, uint256 lpCompensationAmount) =
+            _computeAndCollectProtocolSwapFee(key, id, params, swapDelta, _getSwapTaxAmount());
         hookDeltaUnspecified = feeInUnspecified.toInt128();
 
         PoolKey calldata key_ = key;
@@ -295,10 +277,9 @@ contract AngstromL2 is
             id, UNI_V4, slot0BeforeSwap.tick(), slot0AfterSwap.tick(), key_.tickSpacing
         );
 
-        if (!isTopOfBlock || lpCompensationAmount == 0) {
+        if (lpCompensationAmount == 0) {
             return (this.afterSwap.selector, hookDeltaUnspecified);
         }
-        _blockOfLastTopOfBlock = blockNumber;
 
         params.zeroForOne
             ? _zeroForOneDistributeTax(
@@ -530,22 +511,12 @@ contract AngstromL2 is
         return x > y ? x : y;
     }
 
-    function _getBlock() internal view returns (uint96) {
-        if (address(flashBlockNumberProvider) == address(0)) {
-            return uint96(block.number);
-        }
-        return uint96(flashBlockNumberProvider.getFlashblockNumber());
-    }
-
     function _getSwapTaxAmount() internal view returns (uint256) {
         uint256 priorityFee = tx.gasprice - block.basefee;
         return getSwapTaxAmount(priorityFee);
     }
 
     function _getJitTaxAmount() internal view returns (uint256) {
-        if (_getBlock() == _blockOfLastTopOfBlock) {
-            return 0;
-        }
         uint256 priorityFee = tx.gasprice - block.basefee;
         return getJitTaxAmount(priorityFee);
     }

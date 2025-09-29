@@ -12,7 +12,6 @@ import {HookDeployer} from "./HookDeployer.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "src/hook-config.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
-import {IFlashBlockNumber} from "src/interfaces/IFlashBlockNumber.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -41,14 +40,11 @@ contract BaseTest is Test, HookDeployer {
         address factory,
         bytes memory initcode,
         IPoolManager uniV4,
-        IFlashBlockNumber flashBlockNumberProvider,
         address owner,
         Hooks.Permissions memory requiredPermissions
     ) internal view returns (bytes32 salt) {
         (, salt) = mineAngstromL2Salt(
-            bytes.concat(initcode, abi.encode(uniV4, flashBlockNumberProvider, owner)),
-            factory,
-            requiredPermissions
+            bytes.concat(initcode, abi.encode(uniV4, owner)), factory, requiredPermissions
         );
     }
 
