@@ -12,6 +12,7 @@ import {HookDeployer} from "./HookDeployer.sol";
 import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "src/hook-config.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
+import {Q96MathLib} from "src/libraries/Q96MathLib.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -19,6 +20,7 @@ import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 /// @author philogy <https://github.com/philogy>
 contract BaseTest is Test, HookDeployer {
     using FormatLib for *;
+    using Q96MathLib for uint256;
 
     struct Random {
         bytes32 state;
@@ -34,6 +36,10 @@ contract BaseTest is Test, HookDeployer {
 
     function pm(address addr) internal pure returns (IPoolManager) {
         return IPoolManager(addr);
+    }
+
+    function fmtSqrtX96(uint160 sqrtX96) internal pure returns (string memory) {
+        return uint256(sqrtX96).mulX96(1e18).fmtD(6);
     }
 
     function mineAngstromL2Salt(

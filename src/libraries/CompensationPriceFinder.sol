@@ -27,8 +27,9 @@ library CompensationPriceFinder {
         uint160 priceUpperSqrtX96,
         Slot0 slot0AfterSwap
     ) internal view returns (int24 lastTick, uint160 pstarSqrtX96) {
-        uint256 sumAmount0Deltas = 0; // X
-        uint256 sumAmount1Deltas = 0; // Y
+        uint256 sumAmount0Deltas = 0; // \hat X
+        uint256 sumAmount1Deltas = 0; // \hat Y
+
 
         uint160 priceLowerSqrtX96;
         while (ticks.hasNext()) {

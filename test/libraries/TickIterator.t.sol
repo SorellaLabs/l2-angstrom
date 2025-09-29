@@ -15,7 +15,6 @@ import {RouterActor} from "../_mocks/RouterActor.sol";
 import {UniV4Inspector} from "../_mocks/UniV4Inspector.sol";
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
-import {DynamicArrayLib, DynamicArray} from "solady/src/utils/g/DynamicArrayLib.sol";
 import {TickLib} from "src/libraries/TickLib.sol";
 import {LibSort} from "solady/src/utils/LibSort.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
@@ -26,7 +25,6 @@ contract TickIteratorTest is BaseTest {
     using PoolIdLibrary for PoolKey;
     using TickLib for int24;
     using IUniV4 for IPoolManager;
-    using DynamicArrayLib for *;
     using FormatLib for *;
     using SafeCastLib for *;
 
