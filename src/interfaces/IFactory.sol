@@ -5,6 +5,8 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 
 /// @author philogy <https://github.com/philogy>
 interface IFactory {
+    error WithdrawOnlyMode();
+
     function recordPoolCreationAndGetStartingProtocolFee(
         PoolKey calldata key,
         uint24 creatorSwapFeeE6,
@@ -12,4 +14,5 @@ interface IFactory {
     ) external returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6);
     function defaultProtocolSwapFeeAsMultipleE6() external view returns (uint24);
     function defaultProtocolTaxFeeE6() external view returns (uint24);
+    function withdrawOnly() external view returns (bool);
 }

@@ -81,6 +81,8 @@ contract AngstromL2 is
 
     mapping(PoolId id => PoolRewards) internal rewards;
 
+    bool internal _cachedWithdrawOnly = false;
+
     struct PoolFeeConfiguration {
         bool isInitialized;
         uint24 creatorTaxFeeE6;
@@ -103,6 +105,10 @@ contract AngstromL2 is
     }
 
     receive() external payable {}
+
+    function pullWidthrawOnly() public {
+        _cachedWithdrawOnly = IFactory(FACTORY).withdrawOnly();
+    }
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
@@ -199,6 +205,8 @@ contract AngstromL2 is
     ) external returns (bytes4, BalanceDelta) {
         _onlyUniV4();
 
+        if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
+
         PoolId id = key.calldataToId();
         rewards[id].updateAfterLiquidityAdd(UNI_V4, id, sender, params);
         uint256 taxAmountInEther = _getJitTaxAmount();
@@ -218,6 +226,8 @@ contract AngstromL2 is
         bytes calldata
     ) external returns (bytes4, BalanceDelta) {
         _onlyUniV4();
+
+        if (_cachedWithdrawOnly) return (this.afterRemoveLiquidity.selector, toBalanceDelta(0, 0));
 
         PoolId id = key.calldataToId();
         uint256 rewardAmount0 = rewards[id].updateAfterLiquidityRemove(UNI_V4, id, sender, params);
@@ -241,6 +251,7 @@ contract AngstromL2 is
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         _onlyUniV4();
+        if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
 
         PoolId id = key.calldataToId();
         slot0BeforeSwapStore.set(Slot0.unwrap(UNI_V4.getSlot0(id)));

@@ -31,12 +31,14 @@ contract AngstromL2Factory is Ownable, IFactory {
         uint24 protocolSwapFeeE6,
         uint24 protocolTaxFeeE6
     );
+    event WithdrawOnly();
 
     IPoolManager public immutable UNI_V4;
     IHookAddressMiner public immutable HOOK_ADDRESS_MINER;
     /// @dev Separate address to store init code of hook contract to enable factory to be within
     /// code size limit.
     address public immutable HOOK_INITCODE_STORE;
+    bool public override withdrawOnly;
     /// @dev Default protocol swap fee to be used for new pools, as a multiple of the final resulting swap fee (`defaultProtocolSwapFeeE6 = f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr)))`).
     uint24 public defaultProtocolSwapFeeAsMultipleE6;
     /// @dev Protocol fee on MEV tax from ToB swap.
@@ -57,6 +59,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         UNI_V4 = uniV4;
         HOOK_ADDRESS_MINER = hookAddressMiner;
         HOOK_INITCODE_STORE = SSTORE2.write(type(AngstromL2).creationCode);
+        withdrawOnly = false;
     }
 
     receive() external payable {}
@@ -64,6 +67,14 @@ contract AngstromL2Factory is Ownable, IFactory {
     function withdrawRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
         currency.transfer(to, amount);
+    }
+
+    /// @dev Allows hooks to go into withdraw only mode, note this effectively deletes all liquidity
+    /// provider's rewards. Only to be used in case of serious emergency.
+    function setWithdrawOnly() public {
+        _checkOwner();
+        withdrawOnly = true;
+        emit WithdrawOnly();
     }
 
     function setDefaultProtocolSwapFeeMultiple(uint24 newDefaultProtocolSwapFeeE6) public {
@@ -123,6 +134,8 @@ contract AngstromL2Factory is Ownable, IFactory {
     }
 
     function deployNewHook(address owner, bytes32 salt) public returns (AngstromL2 newAngstrom) {
+        if (withdrawOnly) revert WithdrawOnlyMode();
+
         bytes memory initcode =
             bytes.concat(SSTORE2.read(HOOK_INITCODE_STORE), abi.encode(UNI_V4, owner));
 
@@ -142,6 +155,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
     ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6) {
+        if (withdrawOnly) revert WithdrawOnlyMode();
         if (!isVerifiedHook[AngstromL2(payable(msg.sender))]) revert NotVerifiedHook();
         protocolSwapFeeE6 = getDefaultProtocolSwapFee(creatorSwapFeeE6, key.fee);
         protocolTaxFeeE6 = defaultProtocolTaxFeeE6;
