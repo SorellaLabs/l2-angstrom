@@ -71,7 +71,7 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     /// @dev Allows hooks to go into withdraw only mode, note this effectively deletes all liquidity
     /// provider's rewards. Only to be used in case of serious emergency.
-    function setWithdrawOnly() public {
+    function setEmergencyWithdrawOnly() public {
         _checkOwner();
         withdrawOnly = true;
         emit WithdrawOnly();

@@ -246,6 +246,37 @@ contract AngstromL2Test is BaseTest {
         assertApproxEqAbs(creatorFee * 1e6 / totalOut, 0.02e6, 1);
     }
 
+    function test_withdrawOnly() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        addLiquidity(key, -10, 20, 10e21);
+        addLiquidity(key, -20, 0, 2e21);
+        addLiquidity(key, -20, -10, 3e21);
+        addLiquidity(key, -40, -30, 0.8e21);
+
+        vm.prank(factoryOwner);
+        factory.setEmergencyWithdrawOnly();
+        angstrom.pullWidthrawOnly();
+
+        bytes memory WithdrawOnlyModeSelector =
+            bytes.concat(bytes4(keccak256("WithdrawOnlyMode()")));
+        vm.expectRevert(
+            uniswapWrapperErrorBytes(AngstromL2.beforeSwap.selector, WithdrawOnlyModeSelector)
+        );
+        router.swap(key, true, -100_000_00, int24(-14).getSqrtPriceAtTick());
+
+        vm.expectRevert(
+            uniswapWrapperErrorBytes(
+                AngstromL2.afterAddLiquidity.selector, WithdrawOnlyModeSelector
+            )
+        );
+        addLiquidity(key, -10, 30, 10e21);
+
+        router.modifyLiquidity(key, -10, 20, -10e21, bytes32(0));
+        router.modifyLiquidity(key, -20, 0, -2e21, bytes32(0));
+        router.modifyLiquidity(key, -20, -10, -3e21, bytes32(0));
+        router.modifyLiquidity(key, -40, -30, -0.8e21, bytes32(0));
+    }
+
     function test_factoryGetDefaultProtocolSwapFee() public {
         vm.prank(factoryOwner);
         factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
