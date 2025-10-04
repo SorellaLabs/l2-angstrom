@@ -165,7 +165,9 @@ contract AngstromL2 is
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
     ) public {
-        if (!(msg.sender == owner() || msg.sender == FACTORY)) revert Unauthorized();
+        if (!(msg.sender == owner() || msg.sender == FACTORY)) {
+            revert Unauthorized();
+        }
         if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
         if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];

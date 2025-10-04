@@ -9,6 +9,7 @@ import {IFactory} from "./interfaces/IFactory.sol";
 import {IHookAddressMiner} from "./interfaces/IHookAddressMiner.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {SSTORE2} from "solady/src/utils/SSTORE2.sol";
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
 
 contract AngstromL2Factory is Ownable, IFactory {
@@ -52,9 +53,7 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
-    constructor(address owner, IPoolManager uniV4, IHookAddressMiner hookAddressMiner) 
-    /* Ownable() */
-    {
+    constructor(address owner, IPoolManager uniV4, IHookAddressMiner hookAddressMiner) {
         _initializeOwner(owner);
         UNI_V4 = uniV4;
         HOOK_ADDRESS_MINER = hookAddressMiner;
@@ -111,13 +110,14 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function createNewHookAndPoolWithMiner(
         address initialOwner,
-        PoolKey calldata key,
+        PoolKey memory key,
         uint160 sqrtPriceX96,
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
     ) public returns (AngstromL2 newAngstrom) {
         bytes32 salt = HOOK_ADDRESS_MINER.mineAngstromHookAddress(initialOwner);
         newAngstrom = deployNewHook(initialOwner, salt);
+        key.hooks = IHooks(address(newAngstrom));
         newAngstrom.initializeNewPool(key, sqrtPriceX96, creatorSwapFeeE6, creatorTaxFeeE6);
     }
 

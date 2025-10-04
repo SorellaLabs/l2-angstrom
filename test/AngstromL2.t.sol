@@ -47,6 +47,7 @@ contract AngstromL2Test is BaseTest {
     AngstromL2 angstrom;
     address factoryOwner = makeAddr("factory_owner");
     address hookOwner = makeAddr("hook_owner");
+    IHookAddressMiner miner;
 
     struct Position {
         int24 tickLower;
@@ -57,6 +58,11 @@ contract AngstromL2Test is BaseTest {
     Position[] positions;
 
     MockERC20 token;
+
+    bool constant COMPARE_HARDCODED_MINER = true;
+
+    /// @dev Make sure to update `getMinerCode` if you move this.
+    bool constant HUFF2_INSTALLED = true;
 
     uint160 constant INIT_SQRT_PRICE = 1 << 96; // 1:1 price
 
@@ -70,15 +76,20 @@ contract AngstromL2Test is BaseTest {
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
 
-        factory = new AngstromL2Factory(factoryOwner, manager, IHookAddressMiner(address(0)));
+        bytes memory minerCode = HUFF2_INSTALLED
+            ? getMinerCode(address(manager), COMPARE_HARDCODED_MINER)
+            : getHardcodedMinerCode(address(manager));
+        IHookAddressMiner newMiner;
+        assembly ("memory-safe") {
+            newMiner := create(0, add(minerCode, 0x20), mload(minerCode))
+        }
+        assertTrue(address(newMiner) != address(0), "miner deployment failed");
+        miner = newMiner;
 
-        bytes32 salt = mineAngstromL2Salt(
-            address(factory),
-            type(AngstromL2).creationCode,
-            manager,
-            hookOwner,
-            getRequiredHookPermissions()
-        );
+        factory = new AngstromL2Factory(factoryOwner, manager, miner);
+
+        vm.prank(address(factory));
+        bytes32 salt = miner.mineAngstromHookAddress(hookOwner);
 
         angstrom = factory.deployNewHook(hookOwner, salt);
     }
@@ -209,6 +220,30 @@ contract AngstromL2Test is BaseTest {
         assertEq(getRewards(key, -20, 0), 0);
         assertEq(getRewards(key, -20, -10), 0);
         assertEq(getRewards(key, -40, -30), 0);
+    }
+
+    function test_miner() public {
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 0,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        factory.createNewHookAndPoolWithMiner(makeAddr("user"), key, 1 << 96, 0, 0);
+    }
+
+    function test_benchmark_miner() public {
+        vm.startPrank(address(factory));
+        uint256 gasBefore = gasleft();
+        uint256 total = 400;
+        for (uint256 i = 0; i < total; i++) {
+            address user = address(uint160(i + 230));
+            miner.mineAngstromHookAddress(user);
+        }
+        uint256 netGas = gasBefore - gasleft();
+        vm.stopPrank();
+        console.log("average gas: %s", netGas / total);
     }
 
     function test_delta1WrongRoundingDirection() public {

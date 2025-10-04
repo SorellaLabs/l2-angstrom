@@ -13,6 +13,10 @@ import {Hooks, IHooks} from "v4-core/src/libraries/Hooks.sol";
 import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "src/hook-config.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {Q96MathLib} from "src/libraries/Q96MathLib.sol";
+import {console} from "forge-std/console.sol";
+import {StdStyle} from "forge-std/StdStyle.sol";
+import {LibBytes} from "solady/src/utils/LibBytes.sol";
+import {EfficientHashLib} from "solady/src/utils/EfficientHashLib.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -21,6 +25,7 @@ import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 contract BaseTest is Test, HookDeployer {
     using FormatLib for *;
     using Q96MathLib for uint256;
+    using LibBytes for *;
 
     struct Random {
         bytes32 state;
@@ -34,12 +39,92 @@ contract BaseTest is Test, HookDeployer {
     bytes32 internal constant ANG_CONFIG_STORE_SLOT = bytes32(uint256(0x3));
     bytes32 internal constant ANG_BALANCES_SLOT = bytes32(uint256(0x5));
 
+    bytes internal constant MINER_DEPLOY_CODE =
+        hex"61045e80600a3d393df35f3560e01c632e2e59b91861045a57632b03ad4e5f5260205f6004601c335afa1561045a575f516001813b0360015f82933c73c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1815260043581602001526040015f20604052335f5260ff600b53436020525f5b5060205160016055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16025f106055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16025f106055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026055600b20806020526125cf18613fff16026066575b6020526055600b20806125cf18613fff1661044057602080f35b5f5ffd";
+
     function pm(address addr) internal pure returns (IPoolManager) {
         return IPoolManager(addr);
     }
 
     function fmtSqrtX96(uint160 sqrtX96) internal pure returns (string memory) {
         return uint256(sqrtX96).mulX96(1e18).fmtD(6);
+    }
+
+    function getHardcodedMinerCode(address uniV4) internal pure returns (bytes memory minerCode) {
+        minerCode = MINER_DEPLOY_CODE;
+
+        assembly ("memory-safe") {
+            mstore(0x00, 0)
+
+            let i := add(minerCode, 0x20)
+            for { let end := add(i, mload(minerCode)) } lt(i, end) { i := add(i, 1) } {
+                mcopy(12, i, 20)
+                if iszero(xor(mload(0x00), 0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1)) { break }
+            }
+
+            mstore(0x00, uniV4)
+            mcopy(i, 12, 20)
+        }
+    }
+
+    function getMinerCode(address uniV4, bool verifyHardcoded)
+        internal
+        returns (bytes memory minerCode)
+    {
+        minerCode = MINER_DEPLOY_CODE;
+        string[] memory args = new string[](8);
+        args[0] = "huff";
+        args[1] = "src/Miner.huff";
+        args[2] = "RUNTIME";
+        args[3] = "-f";
+        args[4] = "-e";
+        args[5] = "shanghai";
+        args[6] = "-c";
+        args[7] = string.concat("UNI_V4=", vm.toString(uniV4));
+        try vm.ffi(args) returns (bytes memory code) {
+            minerCode = code;
+            if (!verifyHardcoded) {
+                console.log(StdStyle.yellow("WARNING: Not verifying hardcoded"));
+            }
+            require(
+                !verifyHardcoded || keccak256(minerCode) == keccak256(getHardcodedMinerCode(uniV4)),
+                "hardcoded code wrong"
+            );
+        } catch (bytes memory errData) {
+            if (
+                abi.encodeWithSignature(
+                    "CheatcodeError(string)",
+                    "vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
+                ).eq(errData)
+            ) {
+                return getHardcodedMinerCode(uniV4);
+            }
+            bool sigMatch =
+                bytes4(abi.encodeWithSignature("CheatcodeError(string)")) == bytes4(errData);
+            bytes memory sliced = errData.slice(0x44, 0x44 + 36);
+            if (sigMatch && sliced.eq("vm.ffi: failed to execute command cd")) {
+                revert(
+                    string.concat(
+                        "Failed to run command, may need to install huff (cargo install --git https://github.com/huff-language/huff2) or set HUFF2_INSTALLED=false in test/AngstromL2.t.sol; original error: ",
+                        string(errData.slice(0x44))
+                    )
+                );
+            }
+            assembly ("memory-safe") {
+                revert(add(errData, 0x20), mload(errData))
+            }
+        }
+    }
+
+    function _hashSlice(bytes memory data, uint256 start, uint256 length)
+        private
+        pure
+        returns (bytes32 hash)
+    {
+        require(start + length <= data.length, "_hashSlice: indices out of bounds");
+        assembly ("memory-safe") {
+            hash := keccak256(add(data, add(0x20, start)), length)
+        }
     }
 
     function mineAngstromL2Salt(
@@ -151,11 +236,11 @@ contract BaseTest is Test, HookDeployer {
         return tryFn(this.__safeMod, x, y);
     }
 
-    function tryFn(function(uint, uint) external pure returns (uint) op, uint256 x, uint256 y)
-        internal
-        pure
-        returns (bool hasErr, bytes memory err, uint256 z)
-    {
+    function tryFn(
+        function(uint256, uint256) external pure returns (uint256) op,
+        uint256 x,
+        uint256 y
+    ) internal pure returns (bool hasErr, bytes memory err, uint256 z) {
         try op(x, y) returns (uint256 result) {
             hasErr = false;
             z = result;
