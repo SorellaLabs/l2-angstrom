@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /// @author philogy <https://github.com/philogy>
 
 #define function mineAngstromHookAddress(address owner) public returns (bytes32)
