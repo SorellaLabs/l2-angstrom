@@ -3,7 +3,10 @@ bytecode_hash = "none"
 viaIR = false
 optimizer_runs = 21_000
 verbosity = 3
-fs_permissions = [{ access = "read-write", path = ".forge-snapshots/" }]
+fs_permissions = [
+    { access = "read-write", path = ".forge-snapshots/" },
+    { access = "read", path ="script/config.toml" }
+]
 ast = true
 evm_version = "cancun"
 libs = ["lib"]
@@ -33,6 +36,10 @@ exclude_lints = [
   "incorrect-shift",
   "screaming-snake-case-immutable",
   "erc20-unchecked-transfer",
+  "unsafe-typecast",
+  "unsafe-cheatcode",
+    "named-struct-fields",
+    "divide-before-multiply"
 ]
 
 [profile.default.fmt]

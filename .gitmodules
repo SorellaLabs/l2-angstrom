@@ -16,3 +16,6 @@
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
+[submodule "lib/manyzeros-foundry"]
+	path = lib/manyzeros-foundry
+	url = https://github.com/philogy/manyzeros-foundry
