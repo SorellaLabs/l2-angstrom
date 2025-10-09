@@ -53,8 +53,10 @@ library TickLib {
         returns (int24 normalized)
     {
         assembly ("memory-safe") {
-            normalized :=
-                mul(sub(sdiv(tick, tickSpacing), slt(smod(tick, tickSpacing), 0)), tickSpacing)
+            normalized := mul(
+                sub(sdiv(tick, tickSpacing), slt(smod(tick, tickSpacing), 0)),
+                tickSpacing
+            )
         }
     }
 

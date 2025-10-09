@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {
-    TickIteratorLib, TickIteratorUp, TickIteratorDown
+    TickIteratorLib,
+    TickIteratorUp,
+    TickIteratorDown
 } from "../../src/libraries/TickIterator.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
@@ -81,9 +83,12 @@ contract TickIteratorTest is BaseTest {
     }
 
     // Helper to add liquidity at specific tick range
-    function addLiquidityAtTicks(int24 tickLower, int24 tickUpper, uint128 liquidity, int24 spacing)
-        internal
-    {
+    function addLiquidityAtTicks(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidity,
+        int24 spacing
+    ) internal {
         require(tickLower % spacing == 0, "Lower tick not aligned");
         require(tickUpper % spacing == 0, "Upper tick not aligned");
         require(tickLower < tickUpper, "Invalid range");
@@ -948,8 +953,9 @@ contract TickIteratorTest is BaseTest {
         int256[] memory ticks,
         uint256 wrongIndex
     ) internal pure returns (string memory) {
-        string memory result =
-            string.concat(message, ", start: ", start.toStr(), ", end: ", end.toStr(), ", ticks: [");
+        string memory result = string.concat(
+            message, ", start: ", start.toStr(), ", end: ", end.toStr(), ", ticks: ["
+        );
 
         for (uint256 i = 0; i < ticks.length; i++) {
             if (i > 0) result = string.concat(result, ", ");

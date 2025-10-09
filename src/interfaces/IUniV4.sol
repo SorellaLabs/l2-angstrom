@@ -37,16 +37,12 @@ library IUniV4 {
     uint256 private constant _POSITION_FEE_GROWTH_OUTSIDE0_OFFSET = 1;
     uint256 private constant _POSITION_FEE_GROWTH_OUTSIDE1_OFFSET = 2;
 
-    function gudExtsload(IPoolManager self, uint256 slot)
-        internal
-        view
-        returns (uint256 rawValue)
-    {
+    function gudExtsload(IPoolManager self, uint256 slot) internal view returns (uint256 rawValue) {
         assembly ("memory-safe") {
             mstore(0x20, slot)
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */ )
+                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
                 revert(0x1c, 0x04)
             }
             rawValue := mload(0x00)
@@ -120,7 +116,7 @@ library IUniV4 {
             mstore(0x20, keccak256(0x00, 0x40))
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */ )
+                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
                 revert(0x1c, 0x04)
             }
             let packed := mload(0x00)
@@ -145,7 +141,7 @@ library IUniV4 {
             mstore(0x20, keccak256(0x00, 0x40))
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */ )
+                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
                 revert(0x1c, 0x04)
             }
             liquidity := and(0xffffffffffffffffffffffffffffffff, mload(0x00))

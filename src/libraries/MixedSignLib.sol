@@ -12,7 +12,7 @@ library MixedSignLib {
             z := add(x, y)
 
             if slt(z, x) {
-                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */ )
+                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */)
                 revert(0x1c, 0x04)
             }
         }
@@ -23,7 +23,7 @@ library MixedSignLib {
             z := sub(x, y)
 
             if sgt(z, x) {
-                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */ )
+                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */)
                 revert(0x1c, 0x04)
             }
         }
@@ -34,7 +34,7 @@ library MixedSignLib {
             z := add(x, y)
 
             if shr(128, z) {
-                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */ )
+                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */)
                 revert(0x1c, 0x04)
             }
         }
@@ -45,7 +45,7 @@ library MixedSignLib {
             z := sub(x, y)
 
             if shr(128, z) {
-                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */ )
+                mstore(0x00, 0xc9654ed4 /* ArithmeticOverflowUnderflow() */)
                 revert(0x1c, 0x04)
             }
         }

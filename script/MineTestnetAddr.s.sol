@@ -29,13 +29,9 @@ contract MineTestnetAddrScript is HookDeployer, BaseScript {
     }
 
     function _foundAddr(uint256 id, uint8 nonce) internal view returns (bool) {
-        if (
-            !(
-                validateHookPermissions(
+        if (!(validateHookPermissions(
                     VANITY_MARKET.computeAddress(bytes32(id), nonce), getRequiredHookPermissions()
-                )
-            )
-        ) return false;
+                ))) return false;
         try VANITY_MARKET.addressOf(id) returns (address) {
             return false;
         } catch (bytes memory errData) {

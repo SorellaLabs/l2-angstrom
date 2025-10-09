@@ -174,11 +174,12 @@ contract AngstromL2Factory is Ownable, IFactory {
         returns (uint24)
     {
         // Solve `f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) = defaultProtocolSwapFeeAsMultipleE6` for `f_pr`.
-        return (
-            defaultProtocolSwapFeeAsMultipleE6
+        return (defaultProtocolSwapFeeAsMultipleE6
                 * (FACTOR_E6 * FACTOR_E6 - (FACTOR_E6 - lpFeeE6) * (FACTOR_E6 - creatorSwapFeeE6))
-                / (FACTOR_E6 * FACTOR_E6 - defaultProtocolSwapFeeAsMultipleE6 * (FACTOR_E6 - lpFeeE6))
-        ).toUint24();
+                / (FACTOR_E6
+                    * FACTOR_E6
+                    - defaultProtocolSwapFeeAsMultipleE6
+                    * (FACTOR_E6 - lpFeeE6))).toUint24();
     }
 
     function getDefaultNetPoolSafeSwapFee(uint256 creatorSwapFeeE6, uint256 lpFeeE6)
@@ -187,9 +188,9 @@ contract AngstromL2Factory is Ownable, IFactory {
         returns (uint256)
     {
         uint256 defaultProtocolSwapFeeE6 = getDefaultProtocolSwapFee(creatorSwapFeeE6, lpFeeE6);
-        return (
-            FACTOR_E6 * FACTOR_E6
-                - (FACTOR_E6 - lpFeeE6) * (FACTOR_E6 - creatorSwapFeeE6 - defaultProtocolSwapFeeE6)
-        ) / FACTOR_E6;
+        return (FACTOR_E6
+                * FACTOR_E6
+                - (FACTOR_E6 - lpFeeE6)
+                * (FACTOR_E6 - creatorSwapFeeE6 - defaultProtocolSwapFeeE6)) / FACTOR_E6;
     }
 }

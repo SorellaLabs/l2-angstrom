@@ -98,7 +98,7 @@ contract AngstromL2 is
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
-    constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) /* Ownable() */ {
+    constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) /* Ownable() */  {
         _initializeOwner(owner);
         FACTORY = msg.sender;
         Hooks.validateHookPermissions(IHooks(address(this)), getRequiredHookPermissions());
@@ -286,7 +286,8 @@ contract AngstromL2 is
         PoolKey calldata key_ = key;
         Slot0 slot0BeforeSwap = Slot0.wrap(slot0BeforeSwapStore.get());
         Slot0 slot0AfterSwap = UNI_V4.getSlot0(id);
-        rewards[id].updateAfterTickMove(
+        rewards[id]
+        .updateAfterTickMove(
             id, UNI_V4, slot0BeforeSwap.tick(), slot0AfterSwap.tick(), key_.tickSpacing
         );
 

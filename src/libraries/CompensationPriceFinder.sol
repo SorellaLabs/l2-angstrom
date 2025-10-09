@@ -219,9 +219,8 @@ library CompensationPriceFinder {
             // `A` is zero, compute solution to linear equation.
             // `0 = 2Ls - (Yhat + y)` <> `s = (Yhat + y) / 2L`.
 
-            return (sumUpToThisRange1 + rangeVirtualReserves1).fullMulDiv(
-                1 << (Q96MathLib.RESOLUTION - 1), liquidity
-            ).toUint160();
+            return (sumUpToThisRange1 + rangeVirtualReserves1)
+                .fullMulDiv(1 << (Q96MathLib.RESOLUTION - 1), liquidity).toUint160();
         }
     }
 

@@ -20,7 +20,7 @@ import {VmSafe} from "forge-std/Vm.sol";
 
 import {AngstromL2Factory} from "../src/AngstromL2Factory.sol";
 import {AngstromL2} from "../src/AngstromL2.sol";
-import {getRequiredHookPermissions, POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
+import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
 import {Ownable} from "solady/src/auth/Ownable.sol";
 import {CustomRevert} from "v4-core/src/libraries/CustomRevert.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";

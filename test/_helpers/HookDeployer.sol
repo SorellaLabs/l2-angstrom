@@ -29,8 +29,10 @@ abstract contract HookDeployer is Test {
 
         while (true) {
             assembly ("memory-safe") {
-                addr :=
-                    and(keccak256(add(params, 11), 85), 0xffffffffffffffffffffffffffffffffffffffff)
+                addr := and(
+                    keccak256(add(params, 11), 85),
+                    0xffffffffffffffffffffffffffffffffffffffff
+                )
             }
 
             if (validateHookPermissions(addr, requiredPermissions)) {
@@ -82,10 +84,7 @@ abstract contract HookDeployer is Test {
         }
     }
 
-    function __validateHookPermissions(address addr, Hooks.Permissions memory perms)
-        external
-        pure
-    {
+    function __validateHookPermissions(address addr, Hooks.Permissions memory perms) external pure {
         IHooks(addr).validateHookPermissions(perms);
         if (!IHooks(addr).isValidHookAddress(0)) revert Hooks.HookAddressNotValid(addr);
     }

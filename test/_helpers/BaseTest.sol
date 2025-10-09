@@ -16,7 +16,6 @@ import {Q96MathLib} from "src/libraries/Q96MathLib.sol";
 import {console} from "forge-std/console.sol";
 import {StdStyle} from "forge-std/StdStyle.sol";
 import {LibBytes} from "solady/src/utils/LibBytes.sol";
-import {EfficientHashLib} from "solady/src/utils/EfficientHashLib.sol";
 
 import {MockERC20} from "super-sol/mocks/MockERC20.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
@@ -91,12 +90,10 @@ contract BaseTest is Test, HookDeployer {
                 "hardcoded code wrong"
             );
         } catch (bytes memory errData) {
-            if (
-                abi.encodeWithSignature(
-                    "CheatcodeError(string)",
-                    "vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
-                ).eq(errData)
-            ) {
+            if (abi.encodeWithSignature(
+                        "CheatcodeError(string)",
+                        "vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
+                    ).eq(errData)) {
                 return getHardcodedMinerCode(uniV4);
             }
             bool sigMatch =
