@@ -144,7 +144,10 @@ library TickIteratorLib {
         // therefore we set it `+ 1`.
         self.currentTick = startTick + 1;
 
-        if (startTick == self.endTick) return;
+        if (startTick == self.endTick) {
+            self.currentTick = type(int24).min;
+            return;
+        }
 
         (int16 wordPos,) = TickLib.position(startTick.compress(self.tickSpacing));
         self.currentWord = self.manager.getPoolBitmapInfo(self.poolId, wordPos);

@@ -96,6 +96,8 @@ contract AngstromL2 is
     tuint256 internal liquidityBeforeSwap;
     tbytes32 internal slot0BeforeSwapStore;
 
+    PoolKey[] public poolKeys;
+
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
     constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) /* Ownable() */  {
@@ -178,9 +180,12 @@ contract AngstromL2 is
         UNI_V4.initialize(key, sqrtPriceX96);
         feeConfiguration.creatorSwapFeeE6 = creatorSwapFeeE6.toUint24();
         feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
-        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) = IFactory(FACTORY)
-            .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
+        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) =
+            IFactory(FACTORY)
+                .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
         _checkFeeConfiguration(feeConfiguration);
+
+        poolKeys.push(key);
     }
 
     function _checkFeeConfiguration(PoolFeeConfiguration storage feeConfiguration) internal view {
