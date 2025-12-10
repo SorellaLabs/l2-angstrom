@@ -51,6 +51,8 @@ contract AngstromL2Factory is Ownable, IFactory {
     uint24 internal constant MAX_PROTOCOL_SWAP_FEE_E6 = 0.05e6;
     uint24 internal constant MAX_PROTOCOL_TAX_FEE_E6 = 0.75e6;
 
+    AngstromL2[] public allHooks;
+
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
     constructor(address owner, IPoolManager uniV4, IHookAddressMiner hookAddressMiner) {
@@ -148,6 +150,7 @@ contract AngstromL2Factory is Ownable, IFactory {
             }
         }
         isVerifiedHook[newAngstrom] = true;
+        allHooks.push(newAngstrom);
     }
 
     function recordPoolCreationAndGetStartingProtocolFee(
@@ -179,7 +182,8 @@ contract AngstromL2Factory is Ownable, IFactory {
                 / (FACTOR_E6
                     * FACTOR_E6
                     - defaultProtocolSwapFeeAsMultipleE6
-                    * (FACTOR_E6 - lpFeeE6))).toUint24();
+                    * (FACTOR_E6 - lpFeeE6)))
+        .toUint24();
     }
 
     function getDefaultNetPoolSafeSwapFee(uint256 creatorSwapFeeE6, uint256 lpFeeE6)
