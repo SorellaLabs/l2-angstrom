@@ -2,7 +2,7 @@
 pragma solidity =0.8.26;
 
 import {Ownable} from "solady/src/auth/Ownable.sol";
-import {IPoolManager} from "./interfaces/IUniV4.sol";
+import {IPoolManager, PoolId} from "./interfaces/IUniV4.sol";
 import {AngstromL2} from "./AngstromL2.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
