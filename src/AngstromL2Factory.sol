@@ -52,6 +52,7 @@ contract AngstromL2Factory is Ownable, IFactory {
     uint24 internal constant MAX_PROTOCOL_TAX_FEE_E6 = 0.75e6;
 
     AngstromL2[] public allHooks;
+    mapping(PoolId id => AngstromL2 hook) public hookPoolIds;
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
@@ -165,6 +166,8 @@ contract AngstromL2Factory is Ownable, IFactory {
         if (protocolSwapFeeE6 > MAX_PROTOCOL_SWAP_FEE_E6) {
             protocolSwapFeeE6 = MAX_PROTOCOL_SWAP_FEE_E6;
         }
+        PoolId id = key.calldataToId();
+        hookPoolIds[id] = AngstromL2(msg.sender);
         emit PoolCreated(
             msg.sender, key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
         );
