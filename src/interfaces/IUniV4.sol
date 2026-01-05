@@ -42,7 +42,10 @@ library IUniV4 {
             mstore(0x20, slot)
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
+                mstore(
+                    0x00,
+                    0x535cf94b /* ExtsloadFailed() */
+                )
                 revert(0x1c, 0x04)
             }
             rawValue := mload(0x00)
@@ -116,7 +119,10 @@ library IUniV4 {
             mstore(0x20, keccak256(0x00, 0x40))
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
+                mstore(
+                    0x00,
+                    0x535cf94b /* ExtsloadFailed() */
+                )
                 revert(0x1c, 0x04)
             }
             let packed := mload(0x00)
@@ -141,7 +147,10 @@ library IUniV4 {
             mstore(0x20, keccak256(0x00, 0x40))
             mstore(0x00, EXTSLOAD_SELECTOR)
             if iszero(staticcall(gas(), self, 0x1c, 0x24, 0x00, 0x20)) {
-                mstore(0x00, 0x535cf94b /* ExtsloadFailed() */)
+                mstore(
+                    0x00,
+                    0x535cf94b /* ExtsloadFailed() */
+                )
                 revert(0x1c, 0x04)
             }
             liquidity := and(0xffffffffffffffffffffffffffffffff, mload(0x00))

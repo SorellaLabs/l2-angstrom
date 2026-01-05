@@ -52,7 +52,10 @@ contract PositionFetcher {
         for (; tokenId < lastTokenId; tokenId++) {
             address tokenOwner;
             assembly ("memory-safe") {
-                mstore(0x00, 0x6352211e /* ownerOf(uint256) */)
+                mstore(
+                    0x00,
+                    0x6352211e /* ownerOf(uint256) */
+                )
                 mstore(0x20, tokenId)
                 noError := and(noError, staticcall(gas(), m, 0x1c, 0x24, 0x00, 0x20))
                 tokenOwner := mload(0x00)
@@ -61,7 +64,10 @@ contract PositionFetcher {
 
             PositionInfo info;
             assembly ("memory-safe") {
-                mstore(0x00, 0x89097a6a /* positionInfo(uint256) */)
+                mstore(
+                    0x00,
+                    0x89097a6a /* positionInfo(uint256) */
+                )
                 noError := and(noError, staticcall(gas(), m, 0x1c, 0x24, 0x00, 0x20))
                 info := mload(0x00)
             }
@@ -78,7 +84,10 @@ contract PositionFetcher {
                 address a = _ANGSTROM;
                 address hook;
                 assembly ("memory-safe") {
-                    mstore(0x00, 0x86b6be7d /* poolKeys(bytes25) */)
+                    mstore(
+                        0x00,
+                        0x86b6be7d /* poolKeys(bytes25) */
+                    )
                     mstore(0x20, poolId)
                     noError := and(noError, staticcall(gas(), m, 0x1c, 0x24, 0x00, 0x00))
                     returndatacopy(0x00, 0x80, 0x20)

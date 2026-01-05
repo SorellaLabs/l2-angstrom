@@ -58,7 +58,9 @@ contract BaseTest is Test, HookDeployer {
             let i := add(minerCode, 0x20)
             for { let end := add(i, mload(minerCode)) } lt(i, end) { i := add(i, 1) } {
                 mcopy(12, i, 20)
-                if iszero(xor(mload(0x00), 0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1)) { break }
+                if iszero(xor(mload(0x00), 0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1)) {
+                    break
+                }
             }
 
             mstore(0x00, uniV4)

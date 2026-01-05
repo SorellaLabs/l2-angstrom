@@ -99,14 +99,18 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function setProtocolSwapFee(AngstromL2 hook, PoolKey calldata key, uint256 newFeeE6) public {
         _checkOwner();
-        if (!(newFeeE6 <= MAX_PROTOCOL_SWAP_FEE_E6)) revert ProtocolFeeExceedsMaximum();
+        if (!(newFeeE6 <= MAX_PROTOCOL_SWAP_FEE_E6)) {
+            revert ProtocolFeeExceedsMaximum();
+        }
         hook.setProtocolSwapFee(key, newFeeE6);
         emit ProtocolSwapFeeUpdated(address(hook), key, newFeeE6);
     }
 
     function setProtocolTaxFee(AngstromL2 hook, PoolKey calldata key, uint256 newFeeE6) public {
         _checkOwner();
-        if (!(newFeeE6 <= MAX_PROTOCOL_TAX_FEE_E6)) revert ProtocolFeeExceedsMaximum();
+        if (!(newFeeE6 <= MAX_PROTOCOL_TAX_FEE_E6)) {
+            revert ProtocolFeeExceedsMaximum();
+        }
         hook.setProtocolTaxFee(key, newFeeE6);
         emit ProtocolTaxFeeUpdated(address(hook), key, newFeeE6);
     }
@@ -160,14 +164,16 @@ contract AngstromL2Factory is Ownable, IFactory {
         uint24 creatorTaxFeeE6
     ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6) {
         if (withdrawOnly) revert WithdrawOnlyMode();
-        if (!isVerifiedHook[AngstromL2(payable(msg.sender))]) revert NotVerifiedHook();
+        if (!isVerifiedHook[AngstromL2(payable(msg.sender))]) {
+            revert NotVerifiedHook();
+        }
         protocolSwapFeeE6 = getDefaultProtocolSwapFee(creatorSwapFeeE6, key.fee);
         protocolTaxFeeE6 = defaultProtocolTaxFeeE6;
         if (protocolSwapFeeE6 > MAX_PROTOCOL_SWAP_FEE_E6) {
             protocolSwapFeeE6 = MAX_PROTOCOL_SWAP_FEE_E6;
         }
-        PoolId id = key.calldataToId();
-        hookPoolIds[id] = AngstromL2(msg.sender);
+        PoolId id = key.toId();
+        hookPoolIds[id] = AngstromL2(payable(msg.sender));
         emit PoolCreated(
             msg.sender, key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
         );
@@ -180,8 +186,11 @@ contract AngstromL2Factory is Ownable, IFactory {
         returns (uint24)
     {
         // Solve `f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) = defaultProtocolSwapFeeAsMultipleE6` for `f_pr`.
-        return (defaultProtocolSwapFeeAsMultipleE6
-                * (FACTOR_E6 * FACTOR_E6 - (FACTOR_E6 - lpFeeE6) * (FACTOR_E6 - creatorSwapFeeE6))
+        return ((defaultProtocolSwapFeeAsMultipleE6
+                    * (FACTOR_E6
+                        * FACTOR_E6
+                        - (FACTOR_E6 - lpFeeE6)
+                        * (FACTOR_E6 - creatorSwapFeeE6)))
                 / (FACTOR_E6
                     * FACTOR_E6
                     - defaultProtocolSwapFeeAsMultipleE6

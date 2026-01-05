@@ -83,12 +83,9 @@ contract TickIteratorTest is BaseTest {
     }
 
     // Helper to add liquidity at specific tick range
-    function addLiquidityAtTicks(
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidity,
-        int24 spacing
-    ) internal {
+    function addLiquidityAtTicks(int24 tickLower, int24 tickUpper, uint128 liquidity, int24 spacing)
+        internal
+    {
         require(tickLower % spacing == 0, "Lower tick not aligned");
         require(tickUpper % spacing == 0, "Upper tick not aligned");
         require(tickLower < tickUpper, "Invalid range");

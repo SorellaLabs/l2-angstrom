@@ -291,8 +291,7 @@ contract AngstromL2 is
         PoolKey calldata key_ = key;
         Slot0 slot0BeforeSwap = Slot0.wrap(slot0BeforeSwapStore.get());
         Slot0 slot0AfterSwap = UNI_V4.getSlot0(id);
-        rewards[id]
-        .updateAfterTickMove(
+        rewards[id].updateAfterTickMove(
             id, UNI_V4, slot0BeforeSwap.tick(), slot0AfterSwap.tick(), key_.tickSpacing
         );
 
