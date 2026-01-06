@@ -4,9 +4,8 @@ endpoint_url = "https://mainnet.base.org"
 [base.address]
 uniswap-v4-pool-manager = "0x498581ff718922c3f8e6a244956af099b2652b2b"
 
-[unichain]
-endpoint_url = "https://0xrpc.io/uni"
-
-[unichain.address]
-uniswap-v4-pool-manager = "0x1f98400000000000000000000000000000000004"
-
+# [unichain]
+# endpoint_url = "https://unichain-rpc.publicnode.com"
+#
+# [unichain.address]
+# uniswap-v4-pool-manager = "0x1f98400000000000000000000000000000000004"
