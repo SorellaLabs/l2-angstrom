@@ -290,7 +290,7 @@ contract AngstromL2Test is BaseTest {
 
         vm.prank(factoryOwner);
         factory.setEmergencyWithdrawOnly();
-        angstrom.pullWidthrawOnly();
+        angstrom.pullWithdrawOnly();
 
         bytes memory WithdrawOnlyModeSelector =
             bytes.concat(bytes4(keccak256("WithdrawOnlyMode()")));

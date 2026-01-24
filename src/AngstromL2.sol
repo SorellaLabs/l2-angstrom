@@ -108,7 +108,7 @@ contract AngstromL2 is
 
     receive() external payable {}
 
-    function pullWidthrawOnly() public {
+    function pullWithdrawOnly() public {
         _cachedWithdrawOnly = IFactory(FACTORY).withdrawOnly();
     }
 
