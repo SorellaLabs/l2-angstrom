@@ -55,6 +55,7 @@ contract AngstromL2 is
 
     error CreatorFeeExceedsMaximum();
     error IncompatiblePoolConfiguration();
+    error HooksMismatch();
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
@@ -169,6 +170,9 @@ contract AngstromL2 is
     ) public {
         if (!(msg.sender == owner() || msg.sender == FACTORY)) {
             revert Unauthorized();
+        }
+        if (key.hooks != IHooks(address(this))) {
+            revert HooksMismatch();
         }
         if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
         if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();

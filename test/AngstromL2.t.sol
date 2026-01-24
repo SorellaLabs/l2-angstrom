@@ -1123,6 +1123,55 @@ contract AngstromL2Test is BaseTest {
         angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
     }
 
+    function test_cannotInitializePoolWithZeroAddressHook() public {
+        // arrange
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 0,
+            tickSpacing: 10,
+            hooks: IHooks(address(0))
+        });
+
+        // act & assert
+        vm.prank(hookOwner);
+        vm.expectRevert(AngstromL2.HooksMismatch.selector);
+        angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
+    }
+
+    function test_cannotInitializePoolWithDifferentContractAsHook() public {
+        // arrange
+        address differentContract = makeAddr("different_hook");
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 0,
+            tickSpacing: 10,
+            hooks: IHooks(differentContract)
+        });
+
+        // act & assert
+        vm.prank(hookOwner);
+        vm.expectRevert(AngstromL2.HooksMismatch.selector);
+        angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
+    }
+
+    function test_factoryCannotInitializePoolWithWrongHook() public {
+        // arrange
+        PoolKey memory key = PoolKey({
+            currency0: Currency.wrap(address(0)),
+            currency1: Currency.wrap(address(token)),
+            fee: 0,
+            tickSpacing: 10,
+            hooks: IHooks(address(0))
+        });
+
+        // act & assert
+        vm.prank(address(factory));
+        vm.expectRevert(AngstromL2.HooksMismatch.selector);
+        angstrom.initializeNewPool(key, INIT_SQRT_PRICE, 0, 0);
+    }
+
     function test_maintainsRewardsAfterSwap() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
 
