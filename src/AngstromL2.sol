@@ -406,7 +406,7 @@ contract AngstromL2 is
 
         uint128 liquidity = liquidityBeforeSwap.get().toUint128();
         (int24 lastTick, uint160 pstarSqrtX96) = CompensationPriceFinder.getOneForZero(
-            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap, slot0AfterSwap
+            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap.sqrtPriceX96(), slot0AfterSwap
         );
 
         ticks.reset(slot0BeforeSwap.tick());
