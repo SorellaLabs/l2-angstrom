@@ -33,11 +33,13 @@ import {PoolRewards, PoolRewardsLib} from "./types/PoolRewards.sol";
 import {PoolKeyHelperLib} from "./libraries/PoolKeyHelperLib.sol";
 import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
+import {ReentrancyGuard} from "transient-goodies/ReentrancyGuard.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2 is
     UniConsumer,
     Ownable,
+    ReentrancyGuard,
     IBeforeInitializeHook,
     IBeforeSwapHook,
     IAfterSwapHook,
@@ -213,7 +215,7 @@ contract AngstromL2 is
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external nonReentrant returns (bytes4, BalanceDelta) {
         _onlyUniV4();
 
         if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
@@ -235,7 +237,7 @@ contract AngstromL2 is
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external nonReentrant returns (bytes4, BalanceDelta) {
         _onlyUniV4();
 
         if (_cachedWithdrawOnly) return (this.afterRemoveLiquidity.selector, toBalanceDelta(0, 0));
@@ -259,6 +261,7 @@ contract AngstromL2 is
     function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         external
         override
+        nonReentrant
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         _onlyUniV4();
@@ -284,7 +287,7 @@ contract AngstromL2 is
         SwapParams calldata params,
         BalanceDelta swapDelta,
         bytes calldata
-    ) external override returns (bytes4, int128 hookDeltaUnspecified) {
+    ) external override nonReentrant returns (bytes4, int128 hookDeltaUnspecified) {
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
