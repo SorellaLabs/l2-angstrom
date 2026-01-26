@@ -115,6 +115,8 @@ contract AngstromL2Factory is Ownable, IFactory {
         emit ProtocolTaxFeeUpdated(address(hook), key, newFeeE6);
     }
 
+    /// @dev Only one hook per block per owner can be created using this method.
+    /// As the HOOK_ADDRESS_MINER uses the block number and initialOwner as part of the salt
     function createNewHookAndPoolWithMiner(
         address initialOwner,
         PoolKey memory key,
