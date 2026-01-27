@@ -269,7 +269,7 @@ contract AngstromL2 is
 
         bool exactIn = params.amountSpecified < 0;
         bool etherWasSpecified = params.zeroForOne == exactIn;
-        bool etherInExactIn = params.zeroForOne && etherWasSpecified;
+        bool etherInExactIn = params.zeroForOne && exactIn;
 
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
         uint256 totalSwapFeeRateE6 =
@@ -290,9 +290,6 @@ contract AngstromL2 is
                toBeforeSwapDelta(swapFee.toInt128(), etherDelta)),
             0
         );
-
-        // net effect: amountToSwap is decreased by etherDelta in the case that ETH is the specified asset (cases 1 or 4, below)
-        // otherwise, the hookDeltaUnspecified is set equal to etherDelta
     }
 
     function afterSwap(
@@ -331,11 +328,6 @@ contract AngstromL2 is
         return (this.afterSwap.selector, hookDeltaUnspecified);
     }
 
-// 4 cases:
-// 1: exactIn & zeroForOne: exact ETH in for other token out
-// 2: exactIn & !zeroForOne: exact other token in for ETH out
-// 3: !exactIn & zeroForOne: ETH in for exact other token out
-// 4: !exactIn & !zeroForOne: other token in for exact ETH out
     function _computeAndCollectProtocolSwapFee(
         PoolKey calldata key,
         PoolId id,
@@ -353,7 +345,7 @@ contract AngstromL2 is
         uint256 protocolSwapFeeAmount = 0;
         if (totalSwapFeeRateE6 != 0) {
             int128 unspecifiedDelta =
-                // ETH is always zero, so this is when either ETH is unspecified and other token is exactOut, or other token is exactIn and ETH is unspecified amount out (cases 2 and 3)
+                // ETH is always zero, so this is when either ETH is unspecified and other token is exactOut, or other token is exactIn and ETH is unspecified amount out
                 exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
             uint256 absTargetAmount = unspecifiedDelta.abs();
             fee = exactIn
