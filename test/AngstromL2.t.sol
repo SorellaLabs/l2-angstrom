@@ -320,6 +320,18 @@ contract AngstromL2Test is BaseTest {
         assertEq(factory.getDefaultProtocolSwapFee(0.0002e6, 0.00004e6), 0.000079e6);
     }
 
+    function test_factoryGetDefaultProtocolSwapFee_Fuzz(uint24 defaultMultiple, uint24 creatorSwapFee, uint24 lpFee) public {
+        uint24 boundedDefaultMultiple = uint24(bound(defaultMultiple, 0, 1e6 - 1));
+        uint24 boundedCreatorSwapFee = uint24(bound(creatorSwapFee, 0, 0.2e6));
+        uint24 boundedLpFee = uint24(bound(creatorSwapFee, 0, 0.1e6));
+
+        vm.prank(factoryOwner);
+        factory.setDefaultProtocolSwapFeeMultiple(boundedDefaultMultiple);
+
+        // should never revert
+        factory.getDefaultProtocolSwapFee(boundedCreatorSwapFee, boundedLpFee);
+    }
+
     function test_fuzzing_ffi_zeroForOne(int24 endTick, uint256 priorityFee) public {
         endTick = int24(bound(endTick, int24(-40), int24(2)));
         priorityFee = bound(priorityFee, 0, 10_000 gwei);
