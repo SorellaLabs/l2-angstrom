@@ -47,7 +47,7 @@ contract AngstromL2Factory is Ownable, IFactory {
     mapping(AngstromL2 hook => bool verified) public isVerifiedHook;
 
     uint256 internal constant FACTOR_E6 = 1e6;
-    uint24 internal constant MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6 = 1e6 - 1; // -1 to avoid division by zero erro in extreme cases
+    uint24 internal constant MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6 = 1e6 - 1; // -1 to avoid division by zero error in extreme cases
     uint24 internal constant MAX_PROTOCOL_SWAP_FEE_E6 = 0.05e6;
     uint24 internal constant MAX_PROTOCOL_TAX_FEE_E6 = 0.75e6;
 
