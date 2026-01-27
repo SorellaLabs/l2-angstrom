@@ -252,6 +252,7 @@ contract AngstromL2 is
         );
     }
 
+    uint256 swapFee;
     function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         external
         override
@@ -266,10 +267,27 @@ contract AngstromL2 is
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
         int128 etherDelta = _getSwapTaxAmount().toInt128();
 
-        bool etherWasSpecified = params.zeroForOne == params.amountSpecified < 0;
+        bool exactIn = params.amountSpecified < 0;
+        bool etherWasSpecified = params.zeroForOne == exactIn;
+        bool etherInExactIn = params.zeroForOne && etherWasSpecified;
+
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
+        uint256 totalSwapFeeRateE6 =
+            feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
+
+        swapFee = exactIn ? params.amountSpecified.abs() * totalSwapFeeRateE6 / FACTOR_E6: 0;
+        if (etherInExactIn) {
+            swapFee = (params.amountSpecified.abs() - uint(int256(etherDelta))) * totalSwapFeeRateE6 / FACTOR_E6;
+        }
+
         return (
             this.beforeSwap.selector,
-            etherWasSpecified ? toBeforeSwapDelta(etherDelta, 0) : toBeforeSwapDelta(0, etherDelta),
+           etherInExactIn ? toBeforeSwapDelta(etherDelta+swapFee.toInt128(), 0) : 
+           (etherWasSpecified ? 
+               //@audit exactOut ether out 
+               toBeforeSwapDelta(etherDelta, 0) :
+               //@audit exactIn ether out || exactOut token out (swapFee == 0 here)
+               toBeforeSwapDelta(swapFee.toInt128(), etherDelta)),
             0
         );
 
@@ -336,31 +354,29 @@ contract AngstromL2 is
         if (totalSwapFeeRateE6 != 0) {
             int128 unspecifiedDelta =
                 // ETH is always zero, so this is when either ETH is unspecified and other token is exactOut, or other token is exactIn and ETH is unspecified amount out (cases 2 and 3)
-                // case 2 or 3: unspecifiedDelta = amount0
-                // case 1 or 4: unspecifiedDelta = amount1
                 exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
             uint256 absTargetAmount = unspecifiedDelta.abs();
-            // case 1 or 2 (swapping from exact amount in): fee = absTargetAmount * totalSwapFeeRateE6 / FACTOR_E6
-            // case 3 or 4 (swapping from unspecified amount in): fee = absTargetAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6)
-            // in case 3 & 4, the division seems to be reversing the effect of having already charged the totalSwapFeeRateE6 (it is the inverse of reducing by totalSwapFeeRateE6)
-
-            // case 1: fee = amount0 * totalSwapFeeRateE6 / FACTOR_E6
-            // case 2: fee = amount1 * totalSwapFeeRateE6 / FACTOR_E6
-            // case 3: fee = amount0 * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6)
-            // case 4: fee = amount1 * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6)
             fee = exactIn
                 // swapping from exact amount of ETH into unspecified amount of token, or exact amount of token into unspecified amount of ETH
                 ? absTargetAmount * totalSwapFeeRateE6 / FACTOR_E6
                 // swapping from unspecified of ETH into exact amount of token, or unspecified of token into exact amount of ETH
                 : absTargetAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
 
+            if (exactIn) {
+                fee = uint256(swapFee);
+            }
+
             // Determine protocol/creator split
             creatorSwapFeeAmount = fee * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6;
             protocolSwapFeeAmount = fee - creatorSwapFeeAmount;
+
+            if (exactIn) {
+                fee = 0;
+            }
         }
         // case 2 or 3: feeCurrency = ETH
         // case 1 or 4: feeCurrency = other token
-        Currency feeCurrency = exactIn != params.zeroForOne ? key.currency0 : key.currency1;
+        Currency feeCurrency = params.zeroForOne ? key.currency0 : key.currency1;
 
         if (totalTaxInEther == 0) {
             UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
