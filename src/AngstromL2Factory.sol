@@ -186,6 +186,19 @@ contract AngstromL2Factory is Ownable, IFactory {
         returns (uint24)
     {
         // Solve `f_pr / (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) = defaultProtocolSwapFeeAsMultipleE6` for `f_pr`.
+
+        // f_pr being solved for here is the multiplicative fee after accounting for charging LP fees and (creator + defaultProtocolSwapFeeAsMultipleE6) in series
+
+        // actual op: defaultProtocolSwapFeeAsMultipleE6 * (1 * 1 - (1 - f_lp) * (1 - f_cr)) / (1 * 1 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp))
+        // reordered: defaultProtocolSwapFeeAsMultipleE6 / (1 * 1 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp)) * (1 * 1 - (1 - f_lp) * (1 - f_cr)) 
+
+
+        // f_pr = defaultProtocolSwapFeeAsMultipleE6 * (1 - (1 - f_lp) * (1 - (f_cr + f_pr))) 
+        // f_pr = defaultProtocolSwapFeeAsMultipleE6 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp) * (1 - (f_cr + f_pr))
+        // f_pr = defaultProtocolSwapFeeAsMultipleE6 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp) * (1 - f_cr) + defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp) * f_pr
+        // f_pr * (1 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp)) = defaultProtocolSwapFeeAsMultipleE6 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp) * (1 - f_cr)
+        // f_pr = defaultProtocolSwapFeeAsMultipleE6 * (1 - (1 - f_lp) * (1 - f_cr)) / (1 - defaultProtocolSwapFeeAsMultipleE6 * (1 - f_lp))
+
         return ((defaultProtocolSwapFeeAsMultipleE6
                     * (FACTOR_E6
                         * FACTOR_E6
@@ -204,6 +217,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         returns (uint256)
     {
         uint256 defaultProtocolSwapFeeE6 = getDefaultProtocolSwapFee(creatorSwapFeeE6, lpFeeE6);
+        // (1 * 1 - (1 - f_lp) * (1 - f_cr - f_pr)) / 1
         return (FACTOR_E6
                 * FACTOR_E6
                 - (FACTOR_E6 - lpFeeE6)
