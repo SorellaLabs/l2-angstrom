@@ -266,31 +266,32 @@ contract AngstromL2 is
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
         int128 totalTaxInEther = _getSwapTaxAmount().toInt128();
 
-        bool etherWasSpecified = params.zeroForOne == params.amountSpecified < 0;
         bool exactIn = params.amountSpecified < 0;
-        uint256 amountIn = exactIn ? params.amountSpecified.abs() : 0;
-        if (exactIn && params.zeroForOne) {
-            amountIn -= uint256(int256(totalTaxInEther));
-        }
-        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
-        uint256 totalSwapFeeRateE6 =
-            feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
-        uint256 _swapFee = exactIn ? amountIn * totalSwapFeeRateE6 / FACTOR_E6 : 0;
         BeforeSwapDelta beforeSwapDelta;
-        // exactIn from ETH (ETH specified)
-        if (exactIn && params.zeroForOne) {
-            beforeSwapDelta = toBeforeSwapDelta(totalTaxInEther + _swapFee.toInt128(), 0);
-        // exactIn from token (token specified)
-        } else if (exactIn && !params.zeroForOne) {
-            beforeSwapDelta = toBeforeSwapDelta(_swapFee.toInt128(), totalTaxInEther);
-        // exactOut from ETH (token specified)
-        } else if (!exactIn && params.zeroForOne) {
-            // _swapFee is zero here
-            beforeSwapDelta = toBeforeSwapDelta(_swapFee.toInt128(), totalTaxInEther);
-        // exactOut from token to ETH (ETH specified)
-        } else if (!exactIn && !params.zeroForOne) {
-            // _swapFee is zero here
-            beforeSwapDelta = toBeforeSwapDelta(totalTaxInEther, _swapFee.toInt128());
+        if (exactIn) {
+            uint256 amountIn = params.amountSpecified.abs();
+            // exactIn from ETH (ETH specified)
+            if (params.zeroForOne) {
+                // reduce the amountIn since taxes can be paid in asset in (ETH)
+                amountIn -= uint256(int256(totalTaxInEther));
+            }
+            PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
+            uint256 totalSwapFeeRateE6 =
+                feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
+
+            uint256 swapFee = amountIn * totalSwapFeeRateE6 / FACTOR_E6;
+
+            // exactIn from ETH (ETH specified)
+            if (params.zeroForOne) {
+                beforeSwapDelta = toBeforeSwapDelta(totalTaxInEther + swapFee.toInt128(), 0);
+            // exactIn from token (token specified)
+            } else {
+                beforeSwapDelta = toBeforeSwapDelta(swapFee.toInt128(), totalTaxInEther);
+            }
+        // if !exactIn, then the input amount must be calculated before we apply fees
+        } else {
+            beforeSwapDelta = params.zeroForOne ? toBeforeSwapDelta(0, totalTaxInEther)
+                : toBeforeSwapDelta(totalTaxInEther, 0);
         }
         return (
             this.beforeSwap.selector,
@@ -351,24 +352,20 @@ contract AngstromL2 is
         uint256 creatorSwapFeeAmount = 0;
         uint256 protocolSwapFeeAmount = 0;
         if (totalSwapFeeRateE6 != 0) {    
-            bool etherWasSpecified = params.zeroForOne == exactIn;
-            int128 unspecifiedDelta =
-                !etherWasSpecified ? swapDelta.amount0() : swapDelta.amount1();
-
             uint256 amountIn;
-            // exactIn from ETH (ETH specified)
-            if (exactIn && params.zeroForOne) {
-                // amount in already reduced by tax
-                amountIn = params.amountSpecified.abs() - totalTaxInEther;
-            // exactIn from token (token specified)
-            } else if (exactIn && !params.zeroForOne) {
-                // full amountIn swapped to ensure tax can be paid
+            if (exactIn) {
                 amountIn = params.amountSpecified.abs();
-            // exactOut from ETH (token specified)
-            } else if (!exactIn && params.zeroForOne) {
-                amountIn = unspecifiedDelta.abs();
-            // exactOut from token to ETH (ETH specified)
-            } else if (!exactIn && !params.zeroForOne) {
+                // exactIn from ETH (ETH specified)
+                if (params.zeroForOne) {
+                    // amount in already reduced by tax
+                    amountIn -= totalTaxInEther;
+                }
+                // otherwise exactIn from token (token specified)
+            // otherwise !exactIn
+            } else {
+                bool etherWasSpecified = params.zeroForOne == exactIn;
+                int128 unspecifiedDelta =
+                    !etherWasSpecified ? swapDelta.amount0() : swapDelta.amount1();
                 amountIn = unspecifiedDelta.abs();
             }
 
@@ -376,6 +373,7 @@ contract AngstromL2 is
                 ? amountIn * totalSwapFeeRateE6 / FACTOR_E6
                 : amountIn * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
 
+            // if exactIn, then the fee was already taken in the `beforeSwap` hook, in addition to the tax
             feeInUnspecified = exactIn ? 0 : swapFee;
 
             // Determine protocol/creator split
