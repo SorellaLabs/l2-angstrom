@@ -269,25 +269,12 @@ contract AngstromL2 is
         bool exactIn = params.amountSpecified < 0;
         BeforeSwapDelta beforeSwapDelta;
         if (exactIn) {
-            uint256 amountIn = params.amountSpecified.abs();
-            // exactIn from ETH (ETH specified)
-            if (params.zeroForOne) {
-                // reduce the amountIn since taxes can be paid in asset in (ETH)
-                amountIn -= uint256(int256(totalTaxInEther));
-            }
             PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
-            uint256 totalSwapFeeRateE6 =
-                feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
-
-            uint256 swapFee = amountIn * totalSwapFeeRateE6 / FACTOR_E6;
-
-            // exactIn from ETH (ETH specified)
-            if (params.zeroForOne) {
-                beforeSwapDelta = toBeforeSwapDelta(totalTaxInEther + swapFee.toInt128(), 0);
-            // exactIn from token (token specified)
-            } else {
-                beforeSwapDelta = toBeforeSwapDelta(swapFee.toInt128(), totalTaxInEther);
-            }
+            // if ETH in, then the amount swapped is reduced to pay the tax, prior to fee calculation
+            uint256 swapFee = (params.amountSpecified.abs() - (params.zeroForOne ? uint256(int256(totalTaxInEther)) : 0))
+                * (feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6) / FACTOR_E6;
+            beforeSwapDelta = params.zeroForOne ? toBeforeSwapDelta(totalTaxInEther + swapFee.toInt128(), 0)
+                : toBeforeSwapDelta(swapFee.toInt128(), totalTaxInEther);
         // if !exactIn, then the input amount must be calculated before we apply fees
         } else {
             beforeSwapDelta = params.zeroForOne ? toBeforeSwapDelta(0, totalTaxInEther)
@@ -354,19 +341,11 @@ contract AngstromL2 is
         if (totalSwapFeeRateE6 != 0) {    
             uint256 amountIn;
             if (exactIn) {
-                amountIn = params.amountSpecified.abs();
-                // exactIn from ETH (ETH specified)
-                if (params.zeroForOne) {
-                    // amount in already reduced by tax
-                    amountIn -= totalTaxInEther;
-                }
-                // otherwise exactIn from token (token specified)
-            // otherwise !exactIn
+                amountIn = params.amountSpecified.abs() - (params.zeroForOne ? totalTaxInEther : 0);
+            // otherwise exactOut
             } else {
-                bool etherWasSpecified = params.zeroForOne == exactIn;
-                int128 unspecifiedDelta =
-                    !etherWasSpecified ? swapDelta.amount0() : swapDelta.amount1();
-                amountIn = unspecifiedDelta.abs();
+                bool etherWasSpecified = params.zeroForOne == exactIn;                    
+                amountIn = !etherWasSpecified ? swapDelta.amount0().abs() : swapDelta.amount1().abs();
             }
 
             uint256 swapFee = exactIn
