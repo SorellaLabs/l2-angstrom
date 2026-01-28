@@ -19,7 +19,6 @@ contract AngstromL2Factory is Ownable, IFactory {
     error NotVerifiedHook();
     error FlashBlockNumberProviderAlreadySet();
 
-    event FlashBlockNumberProviderUpdated(address newFlashBlockNumberProvider);
     event DefaultProtocolSwapFeeE6Updated(uint24 newDefaultProtocolSwapFeeE6);
     event DefaultProtocolTaxFeeE6Updated(uint24 newDefaultProtocolTaxFeeE6);
     event ProtocolSwapFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);

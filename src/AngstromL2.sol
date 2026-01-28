@@ -289,7 +289,8 @@ contract AngstromL2 is
         }
         swapFee.set(feeAmount);
 
-        // Tax always comes from ETH; fee comes from specified currency
+        // Tax always comes from ETH; swap fee comes from specified currency for exactIn.
+        // For exactOut swapFee is calculated in the `afterSwap` hook)
         BeforeSwapDelta delta;
         if (etherIsInput && exactIn) {
             delta = toBeforeSwapDelta(swapTax + feeAmount.toInt128(), 0);
@@ -360,10 +361,9 @@ contract AngstromL2 is
                 // For exactIn, fee was pre-computed in beforeSwap
                 totalFeeAmount = swapFee.get();
             } else {
-                // For exactOut, compute fee on unspecified (output) amount
-                bool unspecifiedIsToken0 = exactIn != params.zeroForOne;
+                // For exactOut, compute fee on unspecified (input) amount
                 int128 unspecifiedDelta =
-                    unspecifiedIsToken0 ? swapDelta.amount0() : swapDelta.amount1();
+                    params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
                 uint256 absAmount = unspecifiedDelta.abs();
                 totalFeeAmount = absAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
                 exactOutFeeInUnspecified = totalFeeAmount;
