@@ -71,6 +71,8 @@ contract AngstromL2 is
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`
     event ProtocolTaxDistributed(PoolId indexed poolId, uint256 amount);
+    // @notice Emitted when this contract enters withdraw-only mode
+    event WithdrawOnlyModeActivated();
 
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
@@ -122,8 +124,12 @@ contract AngstromL2 is
 
     receive() external payable {}
 
-    function pullWidthrawOnly() public {
-        _cachedWithdrawOnly = IFactory(FACTORY).withdrawOnly();
+    function pullWithdrawOnly() public {
+        bool _withdrawOnly = IFactory(FACTORY).withdrawOnly();
+        if (_cachedWithdrawOnly != _withdrawOnly) {
+            emit WithdrawOnlyModeActivated();
+            _cachedWithdrawOnly = _withdrawOnly;
+        }
     }
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
