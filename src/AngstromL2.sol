@@ -70,6 +70,11 @@ contract AngstromL2 is
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
 
+    // @notice Emitted when `rewards[poolId].globalGrowthX128` increases by `growthX128`
+    event GlobalGrowthX128Increased(PoolId indexed poolId, uint256 growthX128);
+    // @notice Emitted when `rewards[.poolId].rewardGrowthOutsideX128[tick]` increases by `growthX128`
+    event GrowthOutsideX128Increased(PoolId indexed poolId, int24 tick, uint256 growthX128);
+
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
@@ -495,6 +500,7 @@ contract AngstromL2 is
             unchecked {
                 rewards[ticks.poolId].rewardGrowthOutsideX128[tickNext] += cumulativeGrowthX128;
             }
+            emit GrowthOutsideX128Increased(ticks.poolId, tickNext, cumulativeGrowthX128);
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.sub(liquidityNet);
@@ -507,6 +513,7 @@ contract AngstromL2 is
             cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
+        emit GlobalGrowthX128Increased(ticks.poolId, cumulativeGrowthX128);
     }
 
     function _oneForZeroCreditRewards(
@@ -546,6 +553,7 @@ contract AngstromL2 is
             unchecked {
                 rewards[ticks.poolId].rewardGrowthOutsideX128[tickNext] += cumulativeGrowthX128;
             }
+            emit GrowthOutsideX128Increased(ticks.poolId, tickNext, cumulativeGrowthX128);
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.add(liquidityNet);
@@ -558,6 +566,7 @@ contract AngstromL2 is
             cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
+        emit GlobalGrowthX128Increased(ticks.poolId, cumulativeGrowthX128);
     }
 
     function min(uint160 x, uint160 y) internal pure returns (uint160) {
