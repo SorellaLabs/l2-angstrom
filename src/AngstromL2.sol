@@ -67,6 +67,8 @@ contract AngstromL2 is
     event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     // @notice Emitted when `amount` of `feeCurrency` is taken for the protocol, as fee on `poolId`
     event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    // @notice Emitted when `amount` of native currency is taken for the pool LPs, as tax on `poolId`
+    event LPTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when `amount` of native currency is taken for the pool creator, as tax on `poolId`
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`, during a swap
@@ -381,6 +383,7 @@ contract AngstromL2 is
             totalTaxInEther * feeConfiguration.protocolTaxFeeE6 / FACTOR_E6;
         lpCompensationAmountInEther =
             totalTaxInEther - creatorTaxShareInEther - protocolTaxShareInEther;
+        emit LPTaxDistributed(id, lpCompensationAmountInEther);
         UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, lpCompensationAmountInEther);
 
         if (feeCurrency == NATIVE_CURRENCY) {
