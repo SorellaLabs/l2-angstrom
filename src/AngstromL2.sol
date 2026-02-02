@@ -80,7 +80,13 @@ contract AngstromL2 is
     event WithdrawOnlyModeActivated();
     // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
-
+    // @notice Event mimicking Uniswap PoolManager event, but with `sender`, `sqrtPriceX96`, `liquidity`, and `tick` fields eliminated
+    event Swap(
+        PoolId indexed id,
+        int128 amount0,
+        int128 amount1,
+        uint24 fee
+    );
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -350,6 +356,15 @@ contract AngstromL2 is
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
         uint256 totalSwapFeeRateE6 =
             feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
+        uint256 creatorTaxShareInEther =
+            totalTaxInEther * feeConfiguration.creatorTaxFeeE6 / FACTOR_E6;
+        uint256 protocolTaxShareInEther =
+            totalTaxInEther * feeConfiguration.protocolTaxFeeE6 / FACTOR_E6;
+        lpCompensationAmountInEther =
+            totalTaxInEther - creatorTaxShareInEther - protocolTaxShareInEther;
+        // uint256 ethAmountSwapped = swapDelta.amount0().abs();
+        // uint24 addedFee = uint24(lpCompensationAmountInEther * 1e6 / ethAmountSwapped);
+        emit Swap(id, swapDelta.amount0(), swapDelta.amount1(), key.fee + uint24(lpCompensationAmountInEther * 1e6 / swapDelta.amount0().abs()));
 
         // Compute the total swap fee amount
         bool exactIn = params.amountSpecified < 0;
@@ -377,12 +392,6 @@ contract AngstromL2 is
             return (fee, 0);
         }
 
-        uint256 creatorTaxShareInEther =
-            totalTaxInEther * feeConfiguration.creatorTaxFeeE6 / FACTOR_E6;
-        uint256 protocolTaxShareInEther =
-            totalTaxInEther * feeConfiguration.protocolTaxFeeE6 / FACTOR_E6;
-        lpCompensationAmountInEther =
-            totalTaxInEther - creatorTaxShareInEther - protocolTaxShareInEther;
         emit LPTaxDistributed(id, lpCompensationAmountInEther);
         UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, lpCompensationAmountInEther);
 

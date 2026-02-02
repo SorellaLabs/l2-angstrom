@@ -32,12 +32,15 @@ import {console} from "forge-std/console.sol";
 import {FormatLib} from "super-sol/libraries/FormatLib.sol";
 import {X96FormatLib} from "test/_helpers/X96FormatLib.sol";
 
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2Test is BaseTest {
     using FormatLib for *;
     using X96FormatLib for *;
     using Q96MathLib for uint256;
     using PoolIdLibrary for PoolKey;
+    using FixedPointMathLib for *;
 
     using IUniV4 for UniV4Inspector;
     using TickMath for int24;
@@ -483,10 +486,17 @@ contract AngstromL2Test is BaseTest {
         setPriorityFee(priorityFee);
         uint256 factoryNativeBalanceBefore = address(factory).balance;
 
+        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
+        int256 swapAmount = -100_000_000e18;
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
+
         // need to expect events from uniswap first, even though we don't care about them
         PoolId id = key.toId();
         vm.expectEmit(false, false, false, false);
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.Swap(id,  -10203078424838208273, 10195904141532127892, key.fee + uint24(totalCompensationAmount * 1e6 / 10203078424838208273));
 
         vm.expectEmit(true, true, true, true, address(angstrom));
         emit AngstromL2.LPTaxDistributed(id, 3423140000000000);
@@ -523,7 +533,7 @@ contract AngstromL2Test is BaseTest {
         vm.expectEmit(false, false, false, false);
         emit MockERC20.Transfer(address(0), address(0), 0);
 
-        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+        router.swap(key, true, swapAmount, int24(-35).getSqrtPriceAtTick());
 
         // sanity check that some priority fee-based tax was charged
         uint256 factoryNativeBalanceAfter = address(factory).balance;
@@ -531,8 +541,6 @@ contract AngstromL2Test is BaseTest {
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
@@ -698,10 +706,17 @@ contract AngstromL2Test is BaseTest {
         setPriorityFee(priorityFee);
         uint256 factoryNativeBalanceBefore = address(factory).balance;
 
+        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
+        int256 swapAmount = 100_000_000e18;
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
+
         // need to expect events from uniswap first, even though we don't care about them
         PoolId id = key.toId();
         vm.expectEmit(false, false, false, false);
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.Swap(id,  6896091615910057256, -6903220903715640816, key.fee + uint24(totalCompensationAmount * 1e6 / 6896091615910057256));
 
         vm.expectEmit(true, true, true, true, address(angstrom));
         emit AngstromL2.LPTaxDistributed(id, 3423140000000000);
@@ -744,8 +759,6 @@ contract AngstromL2Test is BaseTest {
         require(factoryNativeBalanceAfter != factoryNativeBalanceBefore, "no swap tax charged!");
 
         uint256 totalRewards = getAllRewards(key);
-        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
