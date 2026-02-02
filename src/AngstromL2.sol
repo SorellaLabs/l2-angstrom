@@ -384,10 +384,10 @@ contract AngstromL2 is
         UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, lpCompensationAmountInEther);
 
         if (feeCurrency == NATIVE_CURRENCY) {
-            emit CreatorFeeDistributed(id, NATIVE_CURRENCY, creatorSwapFeeAmount);
-            emit ProtocolFeeDistributed(id, NATIVE_CURRENCY, protocolSwapFeeAmount);
             emit CreatorTaxDistributed(id, creatorTaxShareInEther);
             emit ProtocolSwapTaxDistributed(id, protocolTaxShareInEther);
+            emit CreatorFeeDistributed(id, NATIVE_CURRENCY, creatorSwapFeeAmount);
+            emit ProtocolFeeDistributed(id, NATIVE_CURRENCY, protocolSwapFeeAmount);
             UNI_V4.take(
                 NATIVE_CURRENCY, address(this), creatorSwapFeeAmount + creatorTaxShareInEther
             );
