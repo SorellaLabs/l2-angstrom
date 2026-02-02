@@ -80,8 +80,11 @@ contract AngstromL2 is
     event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     // @notice Emitted when `amount` of native currency is taken for the pool creator, as tax on `poolId`
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
-    // @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`
-    event ProtocolTaxDistributed(PoolId indexed poolId, uint256 amount);
+    // @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`, during a swap
+    event ProtocolSwapTaxDistributed(PoolId indexed poolId, uint256 amount);
+    /// @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`,
+    /// during adding or removing liquidity
+    event ProtocolJITTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when this contract enters withdraw-only mode
     event WithdrawOnlyModeActivated();
 
@@ -246,7 +249,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
-            emit ProtocolTaxDistributed(id, taxAmountInEther);
+            emit ProtocolJITTaxDistributed(id, taxAmountInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         return (this.afterAddLiquidity.selector, toBalanceDelta(taxAmountInEther.toInt128(), 0));
@@ -269,7 +272,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = params.liquidityDelta == 0 ? 0 : _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
-            emit ProtocolTaxDistributed(id, taxAmountInEther);
+            emit ProtocolJITTaxDistributed(id, taxAmountInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         if (rewardAmount0 > 0) {
@@ -420,14 +423,14 @@ contract AngstromL2 is
             emit CreatorFeeDistributed(id, NATIVE_CURRENCY, creatorSwapFeeAmount);
             emit ProtocolFeeDistributed(id, NATIVE_CURRENCY, protocolSwapFeeAmount);
             emit CreatorTaxDistributed(id, creatorTaxShareInEther);
-            emit ProtocolTaxDistributed(id, protocolTaxShareInEther);
+            emit ProtocolSwapTaxDistributed(id, protocolTaxShareInEther);
             UNI_V4.take(
                 NATIVE_CURRENCY, address(this), creatorSwapFeeAmount + creatorTaxShareInEther
             );
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolSwapFeeAmount + protocolTaxShareInEther);
         } else {
             emit CreatorTaxDistributed(id, creatorTaxShareInEther);
-            emit ProtocolTaxDistributed(id, protocolTaxShareInEther);
+            emit ProtocolSwapTaxDistributed(id, protocolTaxShareInEther);
             UNI_V4.take(NATIVE_CURRENCY, address(this), creatorTaxShareInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolTaxShareInEther);
             emit CreatorFeeDistributed(id, feeCurrency, creatorSwapFeeAmount);
