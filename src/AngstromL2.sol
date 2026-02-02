@@ -76,6 +76,8 @@ contract AngstromL2 is
     event ProtocolJITTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when this contract enters withdraw-only mode
     event WithdrawOnlyModeActivated();
+    // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
+    event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
 
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
@@ -137,6 +139,7 @@ contract AngstromL2 is
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
+        emit CreatorRevenueWithdrawn(currency, to, amount);
         currency.transfer(to, amount);
     }
 
