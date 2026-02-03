@@ -19,7 +19,6 @@ contract AngstromL2Factory is Ownable, IFactory {
     error NotVerifiedHook();
     error FlashBlockNumberProviderAlreadySet();
 
-    event FlashBlockNumberProviderUpdated(address newFlashBlockNumberProvider);
     event DefaultProtocolSwapFeeE6Updated(uint24 newDefaultProtocolSwapFeeE6);
     event DefaultProtocolTaxFeeE6Updated(uint24 newDefaultProtocolTaxFeeE6);
     event ProtocolSwapFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
@@ -47,7 +46,7 @@ contract AngstromL2Factory is Ownable, IFactory {
     mapping(AngstromL2 hook => bool verified) public isVerifiedHook;
 
     uint256 internal constant FACTOR_E6 = 1e6;
-    uint24 internal constant MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6 = 3.0e6; // 3x or 300%
+    uint24 internal constant MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6 = 1e6 - 1; // -1 to avoid division by zero error in extreme cases
     uint24 internal constant MAX_PROTOCOL_SWAP_FEE_E6 = 0.05e6;
     uint24 internal constant MAX_PROTOCOL_TAX_FEE_E6 = 0.75e6;
 
@@ -115,6 +114,8 @@ contract AngstromL2Factory is Ownable, IFactory {
         emit ProtocolTaxFeeUpdated(address(hook), key, newFeeE6);
     }
 
+    /// @dev Only one hook per block per owner can be created using this method.
+    /// As the HOOK_ADDRESS_MINER uses the block number and initialOwner as part of the salt
     function createNewHookAndPoolWithMiner(
         address initialOwner,
         PoolKey memory key,

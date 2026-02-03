@@ -33,11 +33,21 @@ import {PoolRewards, PoolRewardsLib} from "./types/PoolRewards.sol";
 import {PoolKeyHelperLib} from "./libraries/PoolKeyHelperLib.sol";
 import {getRequiredHookPermissions} from "src/hook-config.sol";
 import {tuint256, tbytes32} from "transient-goodies/TransientPrimitives.sol";
+import {ReentrancyGuard} from "transient-goodies/ReentrancyGuard.sol";
+
+struct PoolFeeConfiguration {
+    bool isInitialized;
+    uint24 creatorTaxFeeE6;
+    uint24 protocolTaxFeeE6;
+    uint24 creatorSwapFeeE6;
+    uint24 protocolSwapFeeE6;
+}
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2 is
     UniConsumer,
     Ownable,
+    ReentrancyGuard,
     IBeforeInitializeHook,
     IBeforeSwapHook,
     IAfterSwapHook,
@@ -55,6 +65,7 @@ contract AngstromL2 is
 
     error CreatorFeeExceedsMaximum();
     error IncompatiblePoolConfiguration();
+    error HooksMismatch();
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
@@ -83,17 +94,10 @@ contract AngstromL2 is
 
     bool internal _cachedWithdrawOnly = false;
 
-    struct PoolFeeConfiguration {
-        bool isInitialized;
-        uint24 creatorTaxFeeE6;
-        uint24 protocolTaxFeeE6;
-        uint24 creatorSwapFeeE6;
-        uint24 protocolSwapFeeE6;
-    }
-
     mapping(PoolId id => PoolFeeConfiguration) internal _poolFeeConfiguration;
 
     tuint256 internal liquidityBeforeSwap;
+    tuint256 internal swapFee;
     tbytes32 internal slot0BeforeSwapStore;
 
     PoolKey[] public poolKeys;
@@ -108,7 +112,7 @@ contract AngstromL2 is
 
     receive() external payable {}
 
-    function pullWidthrawOnly() public {
+    function pullWithdrawOnly() public {
         _cachedWithdrawOnly = IFactory(FACTORY).withdrawOnly();
     }
 
@@ -170,6 +174,9 @@ contract AngstromL2 is
         if (!(msg.sender == owner() || msg.sender == FACTORY)) {
             revert Unauthorized();
         }
+        if (key.hooks != IHooks(address(this))) {
+            revert HooksMismatch();
+        }
         if (key.currency0.toId() != NATIVE_CURRENCY_ID) revert IncompatiblePoolConfiguration();
         if (LPFeeLibrary.isDynamicFee(key.fee)) revert IncompatiblePoolConfiguration();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
@@ -209,7 +216,7 @@ contract AngstromL2 is
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external nonReentrant returns (bytes4, BalanceDelta) {
         _onlyUniV4();
 
         if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
@@ -231,7 +238,7 @@ contract AngstromL2 is
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external nonReentrant returns (bytes4, BalanceDelta) {
         _onlyUniV4();
 
         if (_cachedWithdrawOnly) return (this.afterRemoveLiquidity.selector, toBalanceDelta(0, 0));
@@ -255,6 +262,7 @@ contract AngstromL2 is
     function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
         external
         override
+        nonReentrant
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         _onlyUniV4();
@@ -262,16 +270,37 @@ contract AngstromL2 is
 
         PoolId id = key.calldataToId();
         slot0BeforeSwapStore.set(Slot0.unwrap(UNI_V4.getSlot0(id)));
-
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
-        int128 etherDelta = _getSwapTaxAmount().toInt128();
 
-        bool etherWasSpecified = params.zeroForOne == params.amountSpecified < 0;
-        return (
-            this.beforeSwap.selector,
-            etherWasSpecified ? toBeforeSwapDelta(etherDelta, 0) : toBeforeSwapDelta(0, etherDelta),
-            0
-        );
+        int128 swapTax = _getSwapTaxAmount().toInt128();
+        bool exactIn = params.amountSpecified < 0;
+        bool etherIsInput = params.zeroForOne;
+
+        PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
+        uint256 totalSwapFeeRateE6 =
+            feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
+
+        // For exactIn, compute fee on input amount (minus tax if ETH input)
+        uint256 feeAmount = 0;
+        if (exactIn) {
+            uint256 inputAmount = params.amountSpecified.abs();
+            if (etherIsInput) inputAmount -= uint256(int256(swapTax));
+            feeAmount = inputAmount * totalSwapFeeRateE6 / FACTOR_E6;
+        }
+        swapFee.set(feeAmount);
+
+        // Tax always comes from ETH; swap fee comes from specified currency for exactIn.
+        // For exactOut swapFee is calculated in the `afterSwap` hook)
+        BeforeSwapDelta delta;
+        if (etherIsInput && exactIn) {
+            delta = toBeforeSwapDelta(swapTax + feeAmount.toInt128(), 0);
+        } else if (!etherIsInput && !exactIn) {
+            delta = toBeforeSwapDelta(swapTax, 0);
+        } else {
+            delta = toBeforeSwapDelta(feeAmount.toInt128(), swapTax);
+        }
+
+        return (this.beforeSwap.selector, delta, 0);
     }
 
     function afterSwap(
@@ -280,7 +309,7 @@ contract AngstromL2 is
         SwapParams calldata params,
         BalanceDelta swapDelta,
         bytes calldata
-    ) external override returns (bytes4, int128 hookDeltaUnspecified) {
+    ) external override nonReentrant returns (bytes4, int128 hookDeltaUnspecified) {
         _onlyUniV4();
 
         PoolId id = key.calldataToId();
@@ -299,13 +328,15 @@ contract AngstromL2 is
             return (this.afterSwap.selector, hookDeltaUnspecified);
         }
 
-        params.zeroForOne
-            ? _zeroForOneDistributeTax(
-                id, key_.tickSpacing, slot0BeforeSwap, slot0AfterSwap, lpCompensationAmount
-            )
-            : _oneForZeroDistributeTax(
+        if (params.zeroForOne) {
+            _zeroForOneDistributeTax(
                 id, key_.tickSpacing, slot0BeforeSwap, slot0AfterSwap, lpCompensationAmount
             );
+        } else {
+            _oneForZeroDistributeTax(
+                id, key_.tickSpacing, slot0BeforeSwap, slot0AfterSwap, lpCompensationAmount
+            );
+        }
 
         return (this.afterSwap.selector, hookDeltaUnspecified);
     }
@@ -316,33 +347,41 @@ contract AngstromL2 is
         SwapParams calldata params,
         BalanceDelta swapDelta,
         uint256 totalTaxInEther
-    ) internal returns (uint256 fee, uint256 lpCompensationAmountInEther) {
+    ) internal returns (uint256 exactOutFeeInUnspecified, uint256 lpCompensationAmountInEther) {
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[id];
         uint256 totalSwapFeeRateE6 =
             feeConfiguration.protocolSwapFeeE6 + feeConfiguration.creatorSwapFeeE6;
 
-        // Compute the total swap fee amount
         bool exactIn = params.amountSpecified < 0;
-        uint256 creatorSwapFeeAmount = 0;
-        uint256 protocolSwapFeeAmount = 0;
-        if (totalSwapFeeRateE6 != 0) {
-            int128 unspecifiedDelta =
-                exactIn != params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
-            uint256 absTargetAmount = unspecifiedDelta.abs();
-            fee = exactIn
-                ? absTargetAmount * totalSwapFeeRateE6 / FACTOR_E6
-                : absTargetAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
 
-            // Determine protocol/creator split
-            creatorSwapFeeAmount = fee * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6;
-            protocolSwapFeeAmount = fee - creatorSwapFeeAmount;
+        // Compute total fee amount
+        uint256 totalFeeAmount = 0;
+        if (totalSwapFeeRateE6 != 0) {
+            if (exactIn) {
+                // For exactIn, fee was pre-computed in beforeSwap
+                totalFeeAmount = swapFee.get();
+            } else {
+                // For exactOut, compute fee on unspecified (input) amount
+                int128 unspecifiedDelta =
+                    params.zeroForOne ? swapDelta.amount0() : swapDelta.amount1();
+                uint256 absAmount = unspecifiedDelta.abs();
+                totalFeeAmount = absAmount * totalSwapFeeRateE6 / (FACTOR_E6 - totalSwapFeeRateE6);
+                exactOutFeeInUnspecified = totalFeeAmount;
+            }
         }
-        Currency feeCurrency = exactIn != params.zeroForOne ? key.currency0 : key.currency1;
+
+        // Split fee between creator and protocol
+        uint256 creatorSwapFeeAmount = totalSwapFeeRateE6 != 0
+            ? totalFeeAmount * feeConfiguration.creatorSwapFeeE6 / totalSwapFeeRateE6
+            : 0;
+        uint256 protocolSwapFeeAmount = totalFeeAmount - creatorSwapFeeAmount;
+
+        Currency feeCurrency = params.zeroForOne ? key.currency0 : key.currency1;
 
         if (totalTaxInEther == 0) {
             UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
             UNI_V4.take(feeCurrency, FACTORY, protocolSwapFeeAmount);
-            return (fee, 0);
+            return (exactOutFeeInUnspecified, 0);
         }
 
         uint256 creatorTaxShareInEther =
@@ -406,7 +445,7 @@ contract AngstromL2 is
 
         uint128 liquidity = liquidityBeforeSwap.get().toUint128();
         (int24 lastTick, uint160 pstarSqrtX96) = CompensationPriceFinder.getOneForZero(
-            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap, slot0AfterSwap
+            ticks, liquidity, lpCompensationAmount, slot0BeforeSwap.sqrtPriceX96(), slot0AfterSwap
         );
 
         ticks.reset(slot0BeforeSwap.tick());

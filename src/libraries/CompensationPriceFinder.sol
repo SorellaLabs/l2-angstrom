@@ -100,13 +100,12 @@ library CompensationPriceFinder {
         TickIteratorUp memory ticks,
         uint128 liquidity,
         uint256 taxInEther,
-        Slot0 slot0BeforeSwap,
+        uint160 priceLowerSqrtX96,
         Slot0 slot0AfterSwap
     ) internal view returns (int24 lastTick, uint160 pstarSqrtX96) {
         uint256 sumAmount0Deltas = 0; // X
         uint256 sumAmount1Deltas = 0; // Y
 
-        uint160 priceLowerSqrtX96 = slot0BeforeSwap.sqrtPriceX96();
         uint160 priceUpperSqrtX96;
         while (ticks.hasNext()) {
             lastTick = ticks.getNext();
