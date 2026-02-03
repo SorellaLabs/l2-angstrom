@@ -84,8 +84,8 @@ contract AngstromL2Test is BaseTest {
         vm.roll(100);
         manager = new UniV4Inspector();
         router = new RouterActor(manager);
-        vm.deal(address(manager), 1_000 ether);
-        vm.deal(address(router), 100 ether);
+        vm.deal(address(manager), 1_000_000_000 ether);
+        vm.deal(address(router), 100_000_000_000 ether);
 
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
@@ -302,19 +302,19 @@ contract AngstromL2Test is BaseTest {
         vm.expectEmit(false, false, false, false);
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(token)), 203918082830642557);
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 2000000000000000000000000);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(token)), 305877124245963837);
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 3000000000000000000000000);
         BalanceDelta delta =
             router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
 
-        uint256 factoryFee = token.balanceOf(address(factory));
-        uint256 creatorFee = token.balanceOf(address(angstrom));
+        uint256 factoryFee = address(factory).balance;
+        uint256 creatorFee = address(angstrom).balance;
 
-        assertGe(delta.amount1(), 0);
-        uint256 totalOut = uint128(delta.amount1()) + factoryFee + creatorFee;
-        assertApproxEqAbs(factoryFee * 1e6 / totalOut, 0.03e6, 1);
-        assertApproxEqAbs(creatorFee * 1e6 / totalOut, 0.02e6, 1);
+        assertGe(delta.amount1(), 0, "non-positive amountOut");
+        uint256 totalIn = 100_000_000e18;
+        assertApproxEqAbs(factoryFee * 1e6 / totalIn, 0.03e6, 1);
+        assertApproxEqAbs(creatorFee * 1e6 / totalIn, 0.02e6, 1);
     }
 
     function test_withdrawOnly() public {
@@ -365,7 +365,7 @@ contract AngstromL2Test is BaseTest {
     ) public {
         uint24 boundedDefaultMultiple = uint24(bound(defaultMultiple, 0, 1e6 - 1));
         uint24 boundedCreatorSwapFee = uint24(bound(creatorSwapFee, 0, 0.2e6));
-        uint24 boundedLpFee = uint24(bound(creatorSwapFee, 0, 0.1e6));
+        uint24 boundedLpFee = uint24(bound(lpFee, 0, 0.1e6));
 
         vm.prank(factoryOwner);
         factory.setDefaultProtocolSwapFeeMultiple(boundedDefaultMultiple);
@@ -516,14 +516,9 @@ contract AngstromL2Test is BaseTest {
         emit AngstromL2.ProtocolSwapTaxDistributed(id, 3430000000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(token)), 10195904141532127);
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 99999999996570000000000);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(token)), 1131745359710067);
-
-        vm.expectEmit(false, false, false, false);
-        emit MockERC20.Transfer(address(0), address(0), 0);
-        vm.expectEmit(false, false, false, false);
-        emit MockERC20.Transfer(address(0), address(0), 0);
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 11099999999619270000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
         emit AngstromL2.GrowthOutsideX128Increased(id, 0, 49126274423079922271729617826050);
