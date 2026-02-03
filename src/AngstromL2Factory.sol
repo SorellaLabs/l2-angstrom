@@ -32,6 +32,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         uint24 protocolTaxFeeE6
     );
     event WithdrawOnly();
+    event ProtocolRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
 
     IPoolManager public immutable UNI_V4;
     IHookAddressMiner public immutable HOOK_ADDRESS_MINER;
@@ -67,6 +68,7 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function withdrawRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
+        emit ProtocolRevenueWithdrawn(currency, to, amount);
         currency.transfer(to, amount);
     }
 

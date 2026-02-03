@@ -70,6 +70,29 @@ contract AngstromL2 is
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
 
+    // @notice Emitted when `rewards[poolId].globalGrowthX128` increases by `growthX128`
+    event GlobalGrowthX128Increased(PoolId indexed poolId, uint256 growthX128);
+    // @notice Emitted when `rewards[.poolId].rewardGrowthOutsideX128[tick]` increases by `growthX128`
+    event GrowthOutsideX128Increased(PoolId indexed poolId, int24 tick, uint256 growthX128);
+    // @notice Emitted when `amount` of `feeCurrency` is taken for the pool creator, as fee on `poolId`
+    event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    // @notice Emitted when `amount` of `feeCurrency` is taken for the protocol, as fee on `poolId`
+    event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    // @notice Emitted when `amount` of native currency is taken for the pool LPs, as tax on `poolId`
+    event LPTaxDistributed(PoolId indexed poolId, uint256 amount);
+    // @notice Emitted when `amount` of native currency is taken for the pool creator, as tax on `poolId`
+    event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
+    // @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`, during a swap
+    event ProtocolSwapTaxDistributed(PoolId indexed poolId, uint256 amount);
+    /// @notice Emitted when `amount` of native currency is taken for the protocol, as tax on `poolId`,
+    /// during adding or removing liquidity
+    event ProtocolJITTaxDistributed(PoolId indexed poolId, uint256 amount);
+    // @notice Emitted when this contract enters withdraw-only mode
+    event WithdrawOnlyModeActivated();
+    // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
+    event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
+
+
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
@@ -113,11 +136,16 @@ contract AngstromL2 is
     receive() external payable {}
 
     function pullWithdrawOnly() public {
-        _cachedWithdrawOnly = IFactory(FACTORY).withdrawOnly();
+        bool _withdrawOnly = IFactory(FACTORY).withdrawOnly();
+        if (_cachedWithdrawOnly != _withdrawOnly) {
+            emit WithdrawOnlyModeActivated();
+            _cachedWithdrawOnly = _withdrawOnly;
+        }
     }
 
     function withdrawCreatorRevenue(Currency currency, address to, uint256 amount) public {
         _checkOwner();
+        emit CreatorRevenueWithdrawn(currency, to, amount);
         currency.transfer(to, amount);
     }
 
@@ -226,6 +254,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
+            emit ProtocolJITTaxDistributed(id, taxAmountInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         return (this.afterAddLiquidity.selector, toBalanceDelta(taxAmountInEther.toInt128(), 0));
@@ -248,6 +277,7 @@ contract AngstromL2 is
         uint256 taxAmountInEther = params.liquidityDelta == 0 ? 0 : _getJitTaxAmount();
         if (taxAmountInEther > 0) {
             // Protocol collects 100% of the JIT MEV tax
+            emit ProtocolJITTaxDistributed(id, taxAmountInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, taxAmountInEther);
         }
         if (rewardAmount0 > 0) {
@@ -379,6 +409,8 @@ contract AngstromL2 is
         Currency feeCurrency = params.zeroForOne ? key.currency0 : key.currency1;
 
         if (totalTaxInEther == 0) {
+            emit CreatorFeeDistributed(id, feeCurrency, creatorSwapFeeAmount);
+            emit ProtocolFeeDistributed(id, feeCurrency, protocolSwapFeeAmount);
             UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
             UNI_V4.take(feeCurrency, FACTORY, protocolSwapFeeAmount);
             return (exactOutFeeInUnspecified, 0);
@@ -390,16 +422,25 @@ contract AngstromL2 is
             totalTaxInEther * feeConfiguration.protocolTaxFeeE6 / FACTOR_E6;
         lpCompensationAmountInEther =
             totalTaxInEther - creatorTaxShareInEther - protocolTaxShareInEther;
+        emit LPTaxDistributed(id, lpCompensationAmountInEther);
         UNI_V4.mint(address(this), NATIVE_CURRENCY_ID, lpCompensationAmountInEther);
 
         if (feeCurrency == NATIVE_CURRENCY) {
+            emit CreatorTaxDistributed(id, creatorTaxShareInEther);
+            emit ProtocolSwapTaxDistributed(id, protocolTaxShareInEther);
+            emit CreatorFeeDistributed(id, NATIVE_CURRENCY, creatorSwapFeeAmount);
+            emit ProtocolFeeDistributed(id, NATIVE_CURRENCY, protocolSwapFeeAmount);
             UNI_V4.take(
                 NATIVE_CURRENCY, address(this), creatorSwapFeeAmount + creatorTaxShareInEther
             );
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolSwapFeeAmount + protocolTaxShareInEther);
         } else {
+            emit CreatorTaxDistributed(id, creatorTaxShareInEther);
+            emit ProtocolSwapTaxDistributed(id, protocolTaxShareInEther);
             UNI_V4.take(NATIVE_CURRENCY, address(this), creatorTaxShareInEther);
             UNI_V4.take(NATIVE_CURRENCY, FACTORY, protocolTaxShareInEther);
+            emit CreatorFeeDistributed(id, feeCurrency, creatorSwapFeeAmount);
+            emit ProtocolFeeDistributed(id, feeCurrency, protocolSwapFeeAmount);
             UNI_V4.take(feeCurrency, address(this), creatorSwapFeeAmount);
             UNI_V4.take(feeCurrency, FACTORY, protocolSwapFeeAmount);
         }
@@ -495,6 +536,7 @@ contract AngstromL2 is
             unchecked {
                 rewards[ticks.poolId].rewardGrowthOutsideX128[tickNext] += cumulativeGrowthX128;
             }
+            emit GrowthOutsideX128Increased(ticks.poolId, tickNext, cumulativeGrowthX128);
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.sub(liquidityNet);
@@ -507,6 +549,7 @@ contract AngstromL2 is
             cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
+        emit GlobalGrowthX128Increased(ticks.poolId, cumulativeGrowthX128);
     }
 
     function _oneForZeroCreditRewards(
@@ -546,6 +589,7 @@ contract AngstromL2 is
             unchecked {
                 rewards[ticks.poolId].rewardGrowthOutsideX128[tickNext] += cumulativeGrowthX128;
             }
+            emit GrowthOutsideX128Increased(ticks.poolId, tickNext, cumulativeGrowthX128);
 
             (, int128 liquidityNet) = ticks.manager.getTickLiquidity(ticks.poolId, tickNext);
             liquidity = liquidity.add(liquidityNet);
@@ -558,6 +602,7 @@ contract AngstromL2 is
             cumulativeGrowthX128 += PoolRewardsLib.getGrowthDelta(lpCompensationAmount, liquidity);
             rewards[ticks.poolId].globalGrowthX128 += cumulativeGrowthX128;
         }
+        emit GlobalGrowthX128Increased(ticks.poolId, cumulativeGrowthX128);
     }
 
     function min(uint160 x, uint160 y) internal pure returns (uint160) {

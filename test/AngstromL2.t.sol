@@ -10,6 +10,7 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
@@ -66,12 +67,25 @@ contract AngstromL2Test is BaseTest {
 
     uint160 constant INIT_SQRT_PRICE = 1 << 96; // 1:1 price
 
+    event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
+    event ProtocolSwapTaxDistributed(PoolId indexed poolId, uint256 amount);
+    event ProtocolJITTaxDistributed(PoolId indexed poolId, uint256 amount);
+    event WithdrawOnlyModeActivated();
+    event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
+
+    // Uniswap-related event, ERC6909 transfer
+    event Transfer(
+        address caller, address indexed sender, address indexed receiver, uint256 indexed id, uint256 amount
+    );
+
     function setUp() public {
         vm.roll(100);
         manager = new UniV4Inspector();
         router = new RouterActor(manager);
-        vm.deal(address(manager), 1_000 ether);
-        vm.deal(address(router), 100 ether);
+        vm.deal(address(manager), 1_000_000_000 ether);
+        vm.deal(address(router), 100_000_000_000 ether);
 
         token = new MockERC20();
         token.mint(address(router), 1_000_000_000e18);
@@ -126,7 +140,7 @@ contract AngstromL2Test is BaseTest {
         internal
         returns (PoolKey memory key)
     {
-        return initializePool(asset1, tickSpacing, startTick, 0, 0);
+        return initializePool(asset1, tickSpacing, startTick, 0, 0, 0, 0);
     }
 
     function initializePool(
@@ -134,7 +148,9 @@ contract AngstromL2Test is BaseTest {
         int24 tickSpacing,
         int24 startTick,
         uint24 creatorSwapFeeE6,
-        uint24 creatorTaxFeeE6
+        uint24 creatorTaxFeeE6,
+        uint24 defaultProtocolSwapFeeMultiple,
+        uint24 defaultProtocolTaxFee        
     ) internal returns (PoolKey memory key) {
         require(asset1 != address(0), "Token cannot be address(0)");
 
@@ -146,8 +162,20 @@ contract AngstromL2Test is BaseTest {
             hooks: IHooks(address(angstrom))
         });
 
+        vm.startPrank(factory.owner());
+        factory.setDefaultProtocolSwapFeeMultiple(defaultProtocolSwapFeeMultiple);
+        factory.setDefaultProtocolTaxFee(defaultProtocolTaxFee);
+        vm.stopPrank();
+
+        uint24 protocolSwapFeeE6 = factory.getDefaultProtocolSwapFee(creatorSwapFeeE6, key.fee);
+        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.PoolCreated(
+            address(angstrom), key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
+        );
+
         vm.prank(hookOwner);
-        angstrom.initializeNewPool(
+            angstrom.initializeNewPool(
             key, TickMath.getSqrtPriceAtTick(startTick), creatorSwapFeeE6, creatorTaxFeeE6
         );
 
@@ -176,7 +204,6 @@ contract AngstromL2Test is BaseTest {
 
         // console.log("delta.amount0(): %s", delta.amount0().fmtD());
         // console.log("delta.amount1(): %s", delta.amount1().fmtD());
-
         positions.push(
             Position({tickLower: tickLower, tickUpper: tickUpper, liquidity: liquidityAmount})
         );
@@ -263,22 +290,31 @@ contract AngstromL2Test is BaseTest {
     }
 
     function test_swapWithFee() public {
-        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0);
+        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0, 0, 0);
         vm.prank(factoryOwner);
         factory.setProtocolSwapFee(angstrom, key, 0.03e6);
         setupSimpleZeroForOnePositions(key);
 
         setPriorityFee(0);
+
+        PoolId id = key.toId();
+        // need to expect event from uniswap first, even though we don't care about it
+        vm.expectEmit(false, false, false, false);
+        emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 2000000000000000000000000);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 3000000000000000000000000);
         BalanceDelta delta =
             router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
 
-        uint256 factoryFee = token.balanceOf(address(factory));
-        uint256 creatorFee = token.balanceOf(address(angstrom));
+        uint256 factoryFee = address(factory).balance;
+        uint256 creatorFee = address(angstrom).balance;
 
-        assertGe(delta.amount1(), 0);
-        uint256 totalOut = uint128(delta.amount1()) + factoryFee + creatorFee;
-        assertApproxEqAbs(factoryFee * 1e6 / totalOut, 0.03e6, 1);
-        assertApproxEqAbs(creatorFee * 1e6 / totalOut, 0.02e6, 1);
+        assertGe(delta.amount1(), 0, "non-positive amountOut");
+        uint256 totalIn = 100_000_000e18;
+        assertApproxEqAbs(factoryFee * 1e6 / totalIn, 0.03e6, 1);
+        assertApproxEqAbs(creatorFee * 1e6 / totalIn, 0.02e6, 1);
     }
 
     function test_withdrawOnly() public {
@@ -289,6 +325,8 @@ contract AngstromL2Test is BaseTest {
         addLiquidity(key, -40, -30, 0.8e21);
 
         vm.prank(factoryOwner);
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.WithdrawOnly();
         factory.setEmergencyWithdrawOnly();
         angstrom.pullWithdrawOnly();
 
@@ -327,7 +365,7 @@ contract AngstromL2Test is BaseTest {
     ) public {
         uint24 boundedDefaultMultiple = uint24(bound(defaultMultiple, 0, 1e6 - 1));
         uint24 boundedCreatorSwapFee = uint24(bound(creatorSwapFee, 0, 0.2e6));
-        uint24 boundedLpFee = uint24(bound(creatorSwapFee, 0, 0.1e6));
+        uint24 boundedLpFee = uint24(bound(lpFee, 0, 0.1e6));
 
         vm.prank(factoryOwner);
         factory.setDefaultProtocolSwapFeeMultiple(boundedDefaultMultiple);
@@ -443,19 +481,69 @@ contract AngstromL2Test is BaseTest {
     }
 
     function test_simpleZeroForOneSwap1() public {
-        PoolKey memory key = initializePool(address(token), 10, 3);
-
+        uint24 creatorTaxFeeE6 = 1000;
+        PoolKey memory key = initializePool({
+            asset1: address(token),
+            tickSpacing: 10,
+            startTick: 3,
+            creatorSwapFeeE6: 1000,
+            creatorTaxFeeE6: creatorTaxFeeE6,
+            defaultProtocolSwapFeeMultiple: 100000,
+            defaultProtocolTaxFee: 1000
+        });
         setupSimpleZeroForOnePositions(key);
 
         Slot0 slot0BeforeSwap = manager.getSlot0(key.toId());
 
         uint256 priorityFee = 0.7 gwei;
         setPriorityFee(priorityFee);
+        uint256 factoryNativeBalanceBefore = address(factory).balance;
+
+        // need to expect events from uniswap first, even though we don't care about them
+        PoolId id = key.toId();
+        vm.expectEmit(false, false, false, false);
+        emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.LPTaxDistributed(id, 3423140000000000);
+
+        vm.expectEmit(false, false, false, false);
+        emit Transfer(address(0), address(0), address(0), 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorTaxDistributed(id, 3430000000000);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolSwapTaxDistributed(id, 3430000000000);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 99999999996570000000000);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 11099999999619270000000);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, 0, 49126274423079922271729617826050);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, -10, 105257227528991733006759039033134);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, -20, 105257227528991733006759039033134);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, -30, 105257227528991733006759039033134);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GlobalGrowthX128Increased(id, 105257227528992158359717690206213);
+
+        vm.expectEmit(false, false, false, false);
+        emit MockERC20.Transfer(address(0), address(0), 0);
+
         router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
+
+        // sanity check that some priority fee-based tax was charged
+        uint256 factoryNativeBalanceAfter = address(factory).balance;
+        require(factoryNativeBalanceAfter != factoryNativeBalanceBefore, "no swap tax charged!");
 
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
+        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
@@ -603,18 +691,72 @@ contract AngstromL2Test is BaseTest {
     }
 
     function test_simpleOneForZeroSwap1() public {
-        PoolKey memory key = initializePool(address(token), 10, 3);
-
+        uint24 creatorTaxFeeE6 = 1000;
+        PoolKey memory key = initializePool({
+            asset1: address(token),
+            tickSpacing: 10,
+            startTick: 3,
+            creatorSwapFeeE6: 1000,
+            creatorTaxFeeE6: creatorTaxFeeE6,
+            defaultProtocolSwapFeeMultiple: 100000,
+            defaultProtocolTaxFee: 1000
+        });
         setupSimpleOneForZeroPositions(key);
 
         Slot0 slot0BeforeSwap = manager.getSlot0(key.toId());
+
         uint256 priorityFee = 0.7 gwei;
         setPriorityFee(priorityFee);
+        uint256 factoryNativeBalanceBefore = address(factory).balance;
+
+        // need to expect events from uniswap first, even though we don't care about them
+        PoolId id = key.toId();
+        vm.expectEmit(false, false, false, false);
+        emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.LPTaxDistributed(id, 3423140000000000);
+
+        vm.expectEmit(false, false, false, false);
+        emit Transfer(address(0), address(0), address(0), 0, 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorTaxDistributed(id, 3430000000000);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolSwapTaxDistributed(id, 3430000000000);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(token)), 6910898912407324);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(token)), 767109779277214);
+
+        vm.expectEmit(false, false, false, false);
+        emit MockERC20.Transfer(address(0), address(0), 0);
+        vm.expectEmit(false, false, false, false);
+        emit MockERC20.Transfer(address(0), address(0), 0);
+
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, 10, 90983075213412229911694430467655);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, 20, 105590531001571136487631028082079);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GrowthOutsideX128Increased(id, 30, 105590531001571136487631028082079);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.GlobalGrowthX128Increased(id, 105590531001571136487631028082079);
+
+        vm.expectEmit(false, false, false, false);
+        emit MockERC20.Transfer(address(0), address(0), 0);
+
         router.swap(key, false, 100_000_000e18, int24(35).getSqrtPriceAtTick());
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
+        // sanity check that some priority fee-based tax was charged
+        uint256 factoryNativeBalanceAfter = address(factory).balance;
+        require(factoryNativeBalanceAfter != factoryNativeBalanceBefore, "no swap tax charged!");
+
         uint256 totalRewards = getAllRewards(key);
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee);
+        uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
