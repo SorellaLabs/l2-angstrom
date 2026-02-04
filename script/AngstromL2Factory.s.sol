@@ -74,6 +74,8 @@ contract AngstromL2FactoryScript is BaseScript, Config {
             require(
                 address(AngstromL2Factory(payable(factory)).UNI_V4()) == uniV4, "uniV4 mismatch"
             );
+            require(AngstromL2Factory(payable(factory)).owner() == MULTISIG, "owner mismatch");
+            require(AngstromL2Factory(payable(factory)).HOOK_ADDRESS_MINER() == miner, "miner mismatch");
             vm.stopBroadcast();
         }
     }
