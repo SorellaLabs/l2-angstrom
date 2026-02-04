@@ -10,13 +10,14 @@ import {AngstromL2Factory, IHookAddressMiner} from "src/AngstromL2Factory.sol";
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2FactoryScript is BaseScript, Config {
     uint256 constant DEPLOY_TOKEN_ID =
-        0x2c8b14a270eb080c2662a12936bb6b2babf15bf844404871a2914f010e487329;
-    uint8 constant DEPLOY_TOKEN_NONCE = 28;
+        0x2508b97b8041960cca8aabc7662f07ec8e285f6d9212c7ea19ea74be25aa4eeb;
+    uint8 constant DEPLOY_TOKEN_NONCE = 127;
     address constant MULTISIG = 0x2A49fF6D0154506D0e1Eda03655F274126ceF7B6;
 
-    uint256 constant GIVE_UP_CLAIM_DEADLINE = 1760109589;
+    // Feb 2027
+    uint256 constant GIVE_UP_CLAIM_DEADLINE = 1801752092;
     bytes constant GIVE_UP_CLAIM_SIG =
-        hex"ab2d6d71e7add2db6bdaf118e134b750a1417a0ec218cd94f3162be8f2370e0310f796e96c8e806f3fbbf8922054fd230b6ab8bf6810f0d5584f069d757f486c";
+        hex"1d25a58942d38130c426f464d49db8397da58827a5913a90c29b4a276ed9afd87eb6fda3ec556da2082c1d64d83dbed8bb1cba6aa74f42e4286a5a5008147e621b";
 
     function run() public {
         _loadConfigAndForks("script/config.toml", false);
@@ -38,31 +39,42 @@ contract AngstromL2FactoryScript is BaseScript, Config {
                 require(address(miner) != address(0), "failed to deploy miner");
             }
 
-            (bool minted,) = SUB_ZERO.getTokenData(DEPLOY_TOKEN_ID);
-            if (!minted) {
-                console.log("  token noted minted, claiming...");
-                SUB_ZERO.claimGivenUpWithSig(
-                    msg.sender,
+            address factory = SUB_ZERO.computeAddress(bytes32(DEPLOY_TOKEN_ID), DEPLOY_TOKEN_NONCE);
+            if (factory.code.length > 0) {
+                console.log("  factory already deployed: %s", factory);
+            } else {
+                bool minted;
+                try SUB_ZERO.getTokenData(DEPLOY_TOKEN_ID) returns (bool _minted, uint8) {
+                    minted = _minted;
+                } catch {
+                    minted = false;
+                }
+                if (!minted) {
+                    console.log("  token not minted, claiming...");
+
+                    SUB_ZERO.claimGivenUpWithSig(
+                        msg.sender,
+                        DEPLOY_TOKEN_ID,
+                        DEPLOY_TOKEN_NONCE,
+                        msg.sender,
+                        GIVE_UP_CLAIM_DEADLINE,
+                        GIVE_UP_CLAIM_SIG
+                    );
+                }
+
+                factory = SUB_ZERO.deploy(
                     DEPLOY_TOKEN_ID,
-                    DEPLOY_TOKEN_NONCE,
-                    msg.sender,
-                    GIVE_UP_CLAIM_DEADLINE,
-                    GIVE_UP_CLAIM_SIG
+                    bytes.concat(
+                        type(AngstromL2Factory).creationCode, abi.encode(MULTISIG, uniV4, miner)
+                    )
                 );
+                console.log("  factory deployed: %s", factory);
             }
 
-            address factory = SUB_ZERO.deploy(
-                DEPLOY_TOKEN_ID,
-                bytes.concat(
-                    type(AngstromL2Factory).creationCode, abi.encode(MULTISIG, uniV4, miner)
-                )
+            require(
+                address(AngstromL2Factory(payable(factory)).UNI_V4()) == uniV4, "uniV4 mismatch"
             );
-            console.log("  factory: %s", factory);
-
             vm.stopBroadcast();
         }
     }
-
-    // function deployToChain(uint256 chainId, uint deployTokenId) internal {
-    // }
 }
