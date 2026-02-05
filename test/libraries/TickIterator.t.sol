@@ -499,20 +499,18 @@ contract TickIteratorTest is BaseTest {
 
     function test_iterateDown_emptyRange() public {
         // When start == end, the implementation has a quirk:
-        // - currentTick is set to startTick + 1 (line 150)
-        // - The function returns early (line 152) without calling _advanceToNextDown
-        // - hasNext() returns true because currentTick (101) > endTick (100)
-        // - getNext() returns currentTick (101) without advancing
-        // This behavior means an "empty" range actually yields startTick + 1
+        // - currentTick is set to type(int24).min (line 148)
+        // - The function returns early (line 149) without calling _advanceToNextDown
+        // - hasNext() returns false because currentTick (type(int24).min) < endTick (100)
+        // This behavior means an "empty" range actually yields type(int24).min
         addLiquidityAtTicks(90, 110);
 
         TickIteratorDown memory iter =
             TickIteratorLib.initDown(manager, pid, TICK_SPACING, 100, 100);
 
-        // The iterator yields startTick + 1 due to the implementation quirk
-        assertTrue(iter.hasNext(), "Should have a tick due to the quirk");
-        assertEq(iter.getNext(), 101, "Should get startTick + 1");
-        assertFalse(iter.hasNext(), "Should have no more ticks");
+        // The iterator yields type(int24).min due to the implementation quirk
+        assertTrue(!iter.hasNext(), "Should not have a next tick");
+        assertEq(iter.currentTick, type(int24).min, "Should get type(int24).min");
 
         // For a truly empty result, use a range where start < end (invalid)
         // which would cause InvalidRange error, so there's no truly empty valid range
