@@ -57,3 +57,7 @@ The factory deployment script (`script/AngstromL2Factory.s.sol`) handles:
 ```shell
 $ forge script script/AngstromL2Factory.s.sol --broadcast --sender <SENDER>
 ```
+
+### Security
+
+- See [SECURITY.md](./SECURITY.md) for security policies and disclosures.
