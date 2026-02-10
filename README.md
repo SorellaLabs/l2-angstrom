@@ -60,4 +60,5 @@ $ forge script script/AngstromL2Factory.s.sol --broadcast --sender <SENDER>
 
 ### Security
 
+- See [audits](./audits) for a list of audits done previously
 - See [SECURITY.md](./SECURITY.md) for security policies and disclosures.
