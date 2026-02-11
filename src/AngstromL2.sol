@@ -91,7 +91,8 @@ contract AngstromL2 is
     event WithdrawOnlyModeActivated();
     // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
-
+    // @notice Emitted when `jitTaxEnabled` is modified to `newValue`
+    event JITTaxStatusModified(bool newStatus);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -125,6 +126,9 @@ contract AngstromL2 is
 
     PoolKey[] public poolKeys;
 
+    // @notice Whether or not the JIT tax is currently charged by this contract
+    bool public jitTaxEnabled;
+
     // Ownable explicit constructor commented out because of weird foundry bug causing
     // "modifier-style base constructor call without arguments": https://github.com/foundry-rs/foundry/issues/11607.
     constructor(IPoolManager uniV4, address owner) UniConsumer(uniV4) /* Ownable() */  {
@@ -149,6 +153,12 @@ contract AngstromL2 is
         currency.transfer(to, amount);
     }
 
+    function modifyJITTaxStatus(bool newStatus) public {
+        _checkOwner();
+        emit JITTaxStatusModified(newStatus);
+        jitTaxEnabled = newStatus;
+    }
+
     function setProtocolSwapFee(PoolKey calldata key, uint256 newFeeE6) public {
         _checkCallerIsFactory();
         PoolFeeConfiguration storage feeConfiguration = _poolFeeConfiguration[key.calldataToId()];
@@ -169,7 +179,10 @@ contract AngstromL2 is
         return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
     }
 
-    function getJitTaxAmount(uint256 priorityFee) public pure returns (uint256) {
+    function getJitTaxAmount(uint256 priorityFee) public view returns (uint256) {
+        if (!jitTaxEnabled) {
+            return 0;
+        }
         return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
     }
 
