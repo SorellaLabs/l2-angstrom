@@ -69,6 +69,7 @@ contract AngstromL2 is
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
+    error PriorityFeeTaxFloorExceedsMax();
 
     // @notice Emitted when `rewards[poolId].globalGrowthX128` increases by `growthX128`
     event GlobalGrowthX128Increased(PoolId indexed poolId, uint256 growthX128);
@@ -93,6 +94,8 @@ contract AngstromL2 is
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
     // @notice Emitted when `jitTaxEnabled` is modified to `newValue`
     event JITTaxStatusModified(bool newStatus);
+    // @notice Emitted when `priorityFeeTaxFloor` is modified
+    event PriorityFeeTaxFloorModified(uint256 newValue);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -105,14 +108,13 @@ contract AngstromL2 is
     uint256 internal constant JIT_TAXED_GAS = 100_000;
     /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
     uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 3 / 2;
-    /// @dev Swaps and liquidity modifications with priority fees at or below this value pay no tax
-    uint256 internal constant PRIORITY_FEE_TAX_FLOOR = 0.001 gwei;
 
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
     uint256 internal constant FACTOR_E6 = 1e6;
     uint256 internal constant MAX_CREATOR_SWAP_FEE_E6 = 0.2e6;
     uint256 internal constant MAX_CREATOR_TAX_FEE_E6 = 0.5e6; // 50%
+    uint256 internal constant MAX_PRIORITY_FEE_TAX_FLOOR = 100 gwei;
 
     address public immutable FACTORY;
 
@@ -128,7 +130,9 @@ contract AngstromL2 is
 
     PoolKey[] public poolKeys;
 
-    // @notice Whether or not the JIT tax is currently charged by this contract
+    /// @dev Swaps and liquidity modifications with priority fees at or below this value pay no tax
+    uint256 public priorityFeeTaxFloor;
+    /// @notice Whether or not the JIT tax is currently charged by this contract
     bool public jitTaxEnabled;
 
     // Ownable explicit constructor commented out because of weird foundry bug causing
@@ -155,10 +159,17 @@ contract AngstromL2 is
         currency.transfer(to, amount);
     }
 
-    function modifyJITTaxStatus(bool newStatus) public {
+    function setJITTaxStatus(bool newStatus) public {
         _checkOwner();
         emit JITTaxStatusModified(newStatus);
         jitTaxEnabled = newStatus;
+    }
+
+    function setPriorityFeeTaxFloor(uint256 _priorityFeeTaxFloor) public {
+        _checkOwner();
+        if (_priorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        emit PriorityFeeTaxFloorModified(_priorityFeeTaxFloor);
+        priorityFeeTaxFloor = _priorityFeeTaxFloor;
     }
 
     function setProtocolSwapFee(PoolKey calldata key, uint256 newFeeE6) public {
@@ -177,8 +188,8 @@ contract AngstromL2 is
         _checkFeeConfiguration(feeConfiguration);
     }
 
-    function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
-        if (priorityFee <= PRIORITY_FEE_TAX_FLOOR) {
+    function getSwapTaxAmount(uint256 priorityFee) public view returns (uint256) {
+        if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
         return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
@@ -188,7 +199,7 @@ contract AngstromL2 is
         if (!jitTaxEnabled) {
             return 0;
         }
-        if (priorityFee <= PRIORITY_FEE_TAX_FLOOR) {
+        if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
         return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
