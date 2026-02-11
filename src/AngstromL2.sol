@@ -95,7 +95,7 @@ contract AngstromL2 is
     // @notice Emitted when `jitTaxEnabled` is modified to `newValue`
     event JITTaxStatusModified(bool newStatus);
     // @notice Emitted when `priorityFeeTaxFloor` is modified
-    event PriorityFeeTaxFloorModified(uint256 newValue);
+    event PriorityFeeTaxFloorModified(uint256 previousValue, uint256 newValue);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -168,7 +168,7 @@ contract AngstromL2 is
     function setPriorityFeeTaxFloor(uint256 _priorityFeeTaxFloor) public {
         _checkOwner();
         if (_priorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
-        emit PriorityFeeTaxFloorModified(_priorityFeeTaxFloor);
+        emit PriorityFeeTaxFloorModified(priorityFeeTaxFloor, _priorityFeeTaxFloor);
         priorityFeeTaxFloor = _priorityFeeTaxFloor;
     }
 
