@@ -67,6 +67,8 @@ contract AngstromL2Test is BaseTest {
 
     uint160 constant INIT_SQRT_PRICE = 1 << 96; // 1:1 price
 
+    uint256 internal constant MAX_PRIORITY_FEE_TAX_FLOOR = 100 gwei;
+
     event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
@@ -1349,6 +1351,107 @@ contract AngstromL2Test is BaseTest {
 
         addLiquidity(key, -20, 40, 3e21);
         assertEq(getRewards(key, -20, 40), 0, "rewards for [-20, 40]");
+    }
+
+    function test_setJITTaxStatus() public {
+        vm.startPrank(angstrom.owner());
+        bool newStatus = true;
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.JITTaxStatusModified(newStatus);
+
+        angstrom.setJITTaxStatus(newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+        assertGt(angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should not be zero when enabled");
+
+        // repeat check
+        newStatus = true;
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.JITTaxStatusModified(newStatus);
+
+        angstrom.setJITTaxStatus(newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+
+        // check on switch to false
+        newStatus = false;
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.JITTaxStatusModified(newStatus);
+
+        angstrom.setJITTaxStatus(newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+        assertEq(angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should be zero when disabled");
+        vm.stopPrank();
+    }
+
+    function test_setJITTaxStatus_revert_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        angstrom.setJITTaxStatus(true);
+    }
+
+    function test_setPriorityFeeTaxFloor() public {
+        vm.startPrank(angstrom.owner());
+        uint256 priorityFeeTaxFloorBefore = angstrom.priorityFeeTaxFloor();
+        uint256 _priorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR;
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.PriorityFeeTaxFloorModified(priorityFeeTaxFloorBefore, _priorityFeeTaxFloor);
+
+        angstrom.setPriorityFeeTaxFloor(_priorityFeeTaxFloor);
+
+        assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
+            "priorityFeeTaxFloor not set correctly");
+
+        vm.stopPrank();
+    }
+
+    function test_setPriorityFeeTaxFloor_fuzz(uint256 _priorityFeeTaxFloor) public {
+        vm.startPrank(angstrom.owner());
+        if (_priorityFeeTaxFloor <= MAX_PRIORITY_FEE_TAX_FLOOR) {
+            uint256 priorityFeeTaxFloorBefore = angstrom.priorityFeeTaxFloor();
+            vm.expectEmit(true, true, true, true, address(angstrom));
+            emit AngstromL2.PriorityFeeTaxFloorModified(priorityFeeTaxFloorBefore, _priorityFeeTaxFloor);
+
+            angstrom.setPriorityFeeTaxFloor(_priorityFeeTaxFloor);
+
+            assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
+                "priorityFeeTaxFloor not set correctly");
+
+            angstrom.setJITTaxStatus(true);
+            assertEq(angstrom.getJitTaxAmount(_priorityFeeTaxFloor), 0,
+                "JIT tax amount should be zero when priority fee is at floor");
+            assertEq(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor), 0,
+                "swap tax amount should be zero when priority fee is at floor");
+            assertGt(angstrom.getJitTaxAmount(_priorityFeeTaxFloor + 1), 0,
+                "JIT tax amount should be positive when priority fee is above floor");
+            assertGt(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor + 1), 0,
+                "swap tax amount should be positive when priority fee is above floor");
+        } else {
+            vm.expectRevert(AngstromL2.PriorityFeeTaxFloorExceedsMax.selector);
+            angstrom.setPriorityFeeTaxFloor(_priorityFeeTaxFloor);
+        }
+
+        vm.stopPrank();
+    }
+
+    function test_setPriorityFeeTaxFloor_fuzz_SetTwice(
+        uint256 _priorityFeeTaxFloor1,
+        uint256 _priorityFeeTaxFloor2
+    ) public {
+        test_setPriorityFeeTaxFloor_fuzz(_priorityFeeTaxFloor1);
+        test_setPriorityFeeTaxFloor_fuzz(_priorityFeeTaxFloor2);
+    }
+
+    function test_setPriorityFeeTaxFloor_revert_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        angstrom.setPriorityFeeTaxFloor(0);
+    }
+
+    function test_setPriorityFeeTaxFloor_revert_InputTooHigh() public {
+        uint256 _priorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR + 1;
+        vm.prank(angstrom.owner());
+        vm.expectRevert(AngstromL2.PriorityFeeTaxFloorExceedsMax.selector);
+        angstrom.setPriorityFeeTaxFloor(_priorityFeeTaxFloor);
     }
 
     function uniswapWrapperErrorBytes(bytes4 selector, bytes memory angstromError)
