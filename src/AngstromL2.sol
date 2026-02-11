@@ -105,8 +105,8 @@ contract AngstromL2 is
     uint256 internal constant JIT_TAXED_GAS = 100_000;
     /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
     uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 3 / 2;
-    /// @dev Liquidity modifications with priority fees at or below this value pay no tax
-    uint256 internal constant JIT_PRIORITY_FEE_TAX_FLOOR = 0.001 gwei;
+    /// @dev Swaps and liquidity modifications with priority fees at or below this value pay no tax
+    uint256 internal constant PRIORITY_FEE_TAX_FLOOR = 0.001 gwei;
 
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
@@ -178,6 +178,9 @@ contract AngstromL2 is
     }
 
     function getSwapTaxAmount(uint256 priorityFee) public pure returns (uint256) {
+        if (priorityFee <= PRIORITY_FEE_TAX_FLOOR) {
+            return 0;
+        }
         return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
     }
 
@@ -185,7 +188,7 @@ contract AngstromL2 is
         if (!jitTaxEnabled) {
             return 0;
         }
-        if (priorityFee <= JIT_PRIORITY_FEE_TAX_FLOOR) {
+        if (priorityFee <= PRIORITY_FEE_TAX_FLOOR) {
             return 0;
         }
         return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
