@@ -7,16 +7,15 @@ import {ReentrantERC20} from "./_mocks/ReentrantERC20.sol";
 import {UniV4Inspector} from "./_mocks/UniV4Inspector.sol";
 
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
-import {Slot0} from "v4-core/src/types/Slot0.sol";
 
 import {AngstromL2Factory} from "../src/AngstromL2Factory.sol";
-import {AngstromL2, ReentrancyGuard} from "../src/AngstromL2.sol";
+import {AngstromL2} from "../src/AngstromL2.sol";
 import {POOLS_MUST_HAVE_DYNAMIC_FEE} from "../src/hook-config.sol";
 import {IUniV4} from "../src/interfaces/IUniV4.sol";
 import {IHookAddressMiner} from "../src/interfaces/IHookAddressMiner.sol";
