@@ -5,13 +5,14 @@ import {BaseScript} from "./BaseScript.sol";
 import {Config} from "forge-std/Config.sol";
 import {console} from "forge-std/console.sol";
 import {SUB_ZERO} from "manyzeros-foundry/ISubZero.sol";
-import {AngstromL2Factory, IHookAddressMiner} from "src/AngstromL2Factory.sol";
+import {AngstromL2Factory, AngstromL2, IHookAddressMiner, PoolKey, PoolId, Currency, IHooks} from "src/AngstromL2Factory.sol";
+import {StateView} from "v4-periphery/src/lens/StateView.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2FactoryScript is BaseScript, Config {
     uint256 constant DEPLOY_TOKEN_ID =
-        0x2508b97b8041960cca8aabc7662f07ec8e285f6da1dac8631e4d0aebeb26c77f;
-    uint8 constant DEPLOY_TOKEN_NONCE = 20;
+        0x2508b97b8041960cca8aabc7662f07ec8e285f6d0af37978e9add4c8397a16bf;
+    uint8 constant DEPLOY_TOKEN_NONCE = 94;
     address constant MULTISIG = 0x2A49fF6D0154506D0e1Eda03655F274126ceF7B6;
 
     // Feb 2027
@@ -26,6 +27,9 @@ contract AngstromL2FactoryScript is BaseScript, Config {
             uint256 chainId = chainIds[i];
             vm.selectFork(forkOf[chainId]);
             address uniV4 = config.get("uniswap-v4-pool-manager").toAddress();
+            address usdc = config.get("usdc").toAddress();
+            address stateView = config.get("stateview").toAddress();
+            bytes32 referencePricePool = config.get("univ4-largest-eth-usdc-pool").toBytes32();
             console.log("Chain [%s]", chainId);
             console.log("  uniV4: %s", uniV4);
             IHookAddressMiner miner;
@@ -79,6 +83,12 @@ contract AngstromL2FactoryScript is BaseScript, Config {
 
             factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
             factory.setDefaultProtocolTaxFee(0.1e6);
+
+            (uint160 sqrtPriceX96,,,) = StateView(stateView).getSlot0(PoolId.wrap(referencePricePool));
+            PoolKey memory key = PoolKey( Currency.wrap(address(0)), Currency.wrap(usdc), 160, 10, IHooks(address(0)));
+            AngstromL2 hook = factory.createNewHookAndPoolWithMiner(msg.sender, key,sqrtPriceX96, 0, 0);
+            key.hooks = IHooks(address(hook));
+            factory.setProtocolTaxFee(hook, key, 0);
 
             vm.stopBroadcast();
         }

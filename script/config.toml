@@ -3,9 +3,11 @@ endpoint_url = "https://mainnet.base.org"
 
 [base.address]
 uniswap-v4-pool-manager = "0x498581ff718922c3f8e6a244956af099b2652b2b"
+usdc = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+stateview = "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
 
-[unichain]
-endpoint_url = "https://unichain.drpc.org"
+[base.bytes32]
+univ4-largest-eth-usdc-pool = "0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a"
 
 [unichain.address]
 uniswap-v4-pool-manager = "0x1f98400000000000000000000000000000000004"
