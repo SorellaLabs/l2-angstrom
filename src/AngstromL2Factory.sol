@@ -166,7 +166,6 @@ contract AngstromL2Factory is Ownable, IFactory {
         newAngstrom = deployNewHook(initialOwner, salt);
         key.hooks = IHooks(address(newAngstrom));
         newAngstrom.initializeNewPool(key, sqrtPriceX96, creatorSwapFeeE6, creatorTaxFeeE6);
-
     }
 
     function createNewHookAndPoolWithSalt(
