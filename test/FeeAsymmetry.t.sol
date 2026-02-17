@@ -113,7 +113,7 @@ contract FeeAsymmetryPOCTest is BaseTest {
         console.log("Tax: %d wei", tax);
 
         // Use larger swap to make tax relatively small
-        int256 swapAmount = 1 ether; // Tax is ~0.5% of this
+        int256 swapAmount = 2 ether; // Tax is ~0.5% of this
         console.log("Swap amount: %d (tax is ~0.5%% of this)\n", uint256(swapAmount));
 
         setPriorityFee(priorityFee);
@@ -297,7 +297,7 @@ contract FeeAsymmetryPOCTest is BaseTest {
 
         vm.assume(fees.creatorTaxFee + fees.protocolTaxFee <= 1e6);
         // make sure the swap amount is at least 50% greater than the mev swap tax
-        vm.assume(boundedSwapAmount >= 100 gwei * 100_000 * 49 * 3 / 2);
+        vm.assume(boundedSwapAmount >= 100 gwei * 100_000 * 99 * 3 / 2);
 
         // === arrange ===
         setPriorityFee(100 gwei);
