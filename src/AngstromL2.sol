@@ -241,7 +241,7 @@ contract AngstromL2 is
         UNI_V4.initialize(key, sqrtPriceX96);
         feeConfiguration.creatorSwapFeeE6 = creatorSwapFeeE6.toUint24();
         feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
-        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6, jitTaxEnabled, priorityFeeTaxFloor) =
+        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) =
             IFactory(FACTORY)
                 .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
         _checkFeeConfiguration(feeConfiguration);

@@ -166,6 +166,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         newAngstrom = deployNewHook(initialOwner, salt);
         key.hooks = IHooks(address(newAngstrom));
         newAngstrom.initializeNewPool(key, sqrtPriceX96, creatorSwapFeeE6, creatorTaxFeeE6);
+
     }
 
     function createNewHookAndPoolWithSalt(
@@ -196,13 +197,17 @@ contract AngstromL2Factory is Ownable, IFactory {
         }
         isVerifiedHook[newAngstrom] = true;
         allHooks.push(newAngstrom);
+        newAngstrom.setJITTaxEnabled(defaultJITTaxEnabled);
+        emit JITTaxStatusUpdated(address(newAngstrom), defaultJITTaxEnabled);
+        newAngstrom.setPriorityFeeTaxFloor(defaultPriorityFeeTaxFloor);
+        emit PriorityFeeTaxFloorUpdated(address(newAngstrom), defaultPriorityFeeTaxFloor);
     }
 
     function recordPoolCreationAndGetStartingProtocolFee(
         PoolKey calldata key,
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
-    ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6, bool jitTaxEnabled, uint256 priorityFeeTaxFloor) {
+    ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6) {
         if (withdrawOnly) revert WithdrawOnlyMode();
         if (!isVerifiedHook[AngstromL2(payable(msg.sender))]) {
             revert NotVerifiedHook();
@@ -217,7 +222,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         emit PoolCreated(
             msg.sender, key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
         );
-        return (protocolSwapFeeE6, protocolTaxFeeE6, defaultJITTaxEnabled, defaultPriorityFeeTaxFloor);
+        return (protocolSwapFeeE6, protocolTaxFeeE6);
     }
 
     function getDefaultProtocolSwapFee(uint256 creatorSwapFeeE6, uint256 lpFeeE6)

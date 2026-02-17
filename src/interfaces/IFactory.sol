@@ -11,7 +11,7 @@ interface IFactory {
         PoolKey calldata key,
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
-    ) external returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6, bool jitTaxEnabled, uint256 priorityFeeTaxFloor);
+    ) external returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6);
     function defaultProtocolSwapFeeAsMultipleE6() external view returns (uint24);
     function defaultProtocolTaxFeeE6() external view returns (uint24);
     function withdrawOnly() external view returns (bool);
