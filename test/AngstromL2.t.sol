@@ -67,6 +67,8 @@ contract AngstromL2Test is BaseTest {
 
     uint160 constant INIT_SQRT_PRICE = 1 << 96; // 1:1 price
 
+    uint256 internal constant MAX_PRIORITY_FEE_TAX_FLOOR = 100 gwei;
+
     event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
@@ -1349,6 +1351,171 @@ contract AngstromL2Test is BaseTest {
 
         addLiquidity(key, -20, 40, 3e21);
         assertEq(getRewards(key, -20, 40), 0, "rewards for [-20, 40]");
+    }
+
+    function test_setDefaultJITTaxEnabled() public {
+        vm.startPrank(factory.owner());
+        bool newStatus = true;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.DefaultJITTaxStatusUpdated(newStatus);
+
+        factory.setDefaultJITTaxEnabled(newStatus);
+
+        assertEq(factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly");
+
+        // also check switch to false
+        newStatus = false;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.DefaultJITTaxStatusUpdated(newStatus);
+
+        factory.setDefaultJITTaxEnabled(newStatus);
+
+        assertEq(factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly");
+    }
+
+    function test_setDefaultJITTaxEnabled_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        factory.setDefaultJITTaxEnabled(true);
+    }
+
+    function test_setJITTaxEnabled() public {
+        vm.startPrank(factory.owner());
+        bool newStatus = true;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.JITTaxStatusUpdated(address(angstrom), newStatus);
+
+        factory.setJITTaxEnabled(angstrom, newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+        assertGt(angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should not be zero when enabled");
+
+        // repeat check
+        newStatus = true;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.JITTaxStatusUpdated(address(angstrom), newStatus);
+
+        factory.setJITTaxEnabled(angstrom, newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+
+        // check on switch to false
+        newStatus = false;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.JITTaxStatusUpdated(address(angstrom), newStatus);
+
+        factory.setJITTaxEnabled(angstrom, newStatus);
+
+        assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
+        assertEq(angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should be zero when disabled");
+        vm.stopPrank();
+    }
+
+    function test_setJITTaxEnabled_revert_NotFactory() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        angstrom.setJITTaxEnabled(true);
+    }
+
+    function test_setJITTaxEnabled_revert_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        factory.setJITTaxEnabled(angstrom, true);
+    }
+
+    function test_setDefaultPriorityFeeTaxFloor() public {
+        vm.startPrank(factory.owner());
+        uint256 newDefaultPriorityFeeTaxFloor = 0;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.DefaultPriorityFeeTaxFloorUpdated(newDefaultPriorityFeeTaxFloor);
+
+        factory.setDefaultPriorityFeeTaxFloor(newDefaultPriorityFeeTaxFloor);
+
+        assertEq(factory.defaultPriorityFeeTaxFloor(), newDefaultPriorityFeeTaxFloor, "defaultPriorityFeeTaxFloor not set correctly");
+
+        // also check switch to max
+        newDefaultPriorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.DefaultPriorityFeeTaxFloorUpdated(newDefaultPriorityFeeTaxFloor);
+
+        factory.setDefaultPriorityFeeTaxFloor(newDefaultPriorityFeeTaxFloor);
+
+        assertEq(factory.defaultPriorityFeeTaxFloor(), newDefaultPriorityFeeTaxFloor, "defaultPriorityFeeTaxFloor not set correctly");
+    }
+
+    function test_setDefaultPriorityFeeTaxFloor_revert_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        factory.setDefaultPriorityFeeTaxFloor(0);
+    }
+
+    function test_setDefaultPriorityFeeTaxFloor_revert_InputTooHigh() public {
+        vm.startPrank(factory.owner());
+        vm.expectRevert(AngstromL2Factory.PriorityFeeTaxFloorExceedsMax.selector);
+        factory.setDefaultPriorityFeeTaxFloor(MAX_PRIORITY_FEE_TAX_FLOOR + 1);
+    }
+
+    function test_setPriorityFeeTaxFloor() public {
+        vm.startPrank(factory.owner());
+        uint256 _priorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR;
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(address(angstrom), _priorityFeeTaxFloor);
+
+        factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
+
+        assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
+            "priorityFeeTaxFloor not set correctly");
+
+        vm.stopPrank();
+    }
+
+    function test_setPriorityFeeTaxFloor_fuzz(uint256 _priorityFeeTaxFloor) public {
+        vm.startPrank(factory.owner());
+        if (_priorityFeeTaxFloor <= MAX_PRIORITY_FEE_TAX_FLOOR) {
+            vm.expectEmit(true, true, true, true, address(factory));
+            emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(address(angstrom), _priorityFeeTaxFloor);
+
+            factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
+
+            assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
+                "priorityFeeTaxFloor not set correctly");
+
+            factory.setJITTaxEnabled(angstrom, true);
+            assertEq(angstrom.getJitTaxAmount(_priorityFeeTaxFloor), 0,
+                "JIT tax amount should be zero when priority fee is at floor");
+            assertEq(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor), 0,
+                "swap tax amount should be zero when priority fee is at floor");
+            assertGt(angstrom.getJitTaxAmount(_priorityFeeTaxFloor + 1), 0,
+                "JIT tax amount should be positive when priority fee is above floor");
+            assertGt(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor + 1), 0,
+                "swap tax amount should be positive when priority fee is above floor");
+        } else {
+            vm.expectRevert(AngstromL2.PriorityFeeTaxFloorExceedsMax.selector);
+            factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
+        }
+
+        vm.stopPrank();
+    }
+
+    function test_setPriorityFeeTaxFloor_fuzz_SetTwice(
+        uint256 _priorityFeeTaxFloor1,
+        uint256 _priorityFeeTaxFloor2
+    ) public {
+        test_setPriorityFeeTaxFloor_fuzz(_priorityFeeTaxFloor1);
+        test_setPriorityFeeTaxFloor_fuzz(_priorityFeeTaxFloor2);
+    }
+
+    function test_setPriorityFeeTaxFloor_revert_NotOwner() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        factory.setPriorityFeeTaxFloor(angstrom, 0);
+    }
+
+    function test_setPriorityFeeTaxFloor_revert_NotFactory() public {
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        angstrom.setPriorityFeeTaxFloor(0);
+    }
+
+    function test_setPriorityFeeTaxFloor_revert_InputTooHigh() public {
+        uint256 _priorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR + 1;
+        vm.prank(factory.owner());
+        vm.expectRevert(AngstromL2Factory.PriorityFeeTaxFloorExceedsMax.selector);
+        factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
     }
 
     function uniswapWrapperErrorBytes(bytes4 selector, bytes memory angstromError)
