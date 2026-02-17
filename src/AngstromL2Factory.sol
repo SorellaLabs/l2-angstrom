@@ -16,13 +16,18 @@ contract AngstromL2Factory is Ownable, IFactory {
     using SafeCastLib for *;
 
     error ProtocolFeeExceedsMaximum();
+    error PriorityFeeTaxFloorExceedsMax();
     error NotVerifiedHook();
     error FlashBlockNumberProviderAlreadySet();
 
     event DefaultProtocolSwapFeeE6Updated(uint24 newDefaultProtocolSwapFeeE6);
     event DefaultProtocolTaxFeeE6Updated(uint24 newDefaultProtocolTaxFeeE6);
+    event DefaultJITTaxStatusUpdated(bool newDefaultJITTaxEnabled);
+    event DefaultPriorityFeeTaxFloorUpdated(uint256 newDefaultPriorityFeeTaxFloor);
     event ProtocolSwapFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
     event ProtocolTaxFeeUpdated(address indexed hook, PoolKey key, uint256 newFeeE6);
+    event JITTaxStatusUpdated(address indexed hook, bool newJITTaxEnabled);
+    event PriorityFeeTaxFloorUpdated(address indexed hook, uint256 newPriorityFeeTaxFloor);
     event PoolCreated(
         address hook,
         PoolKey key,
@@ -44,12 +49,18 @@ contract AngstromL2Factory is Ownable, IFactory {
     uint24 public defaultProtocolSwapFeeAsMultipleE6;
     /// @dev Protocol fee on MEV tax from ToB swap.
     uint24 public defaultProtocolTaxFeeE6;
+    /// @dev Whether or not the JIT tax is configured by default to be charged by new hooks
+    bool public defaultJITTaxEnabled;
+    /// @dev Value of `priorityFeeTaxFloor` set on newly-deployed hooks
+    uint256 public defaultPriorityFeeTaxFloor;
+
     mapping(AngstromL2 hook => bool verified) public isVerifiedHook;
 
     uint256 internal constant FACTOR_E6 = 1e6;
     uint24 internal constant MAX_DEFAULT_PROTOCOL_FEE_MULTIPLE_E6 = 1e6 - 1; // -1 to avoid division by zero error in extreme cases
     uint24 internal constant MAX_PROTOCOL_SWAP_FEE_E6 = 0.05e6;
     uint24 internal constant MAX_PROTOCOL_TAX_FEE_E6 = 0.75e6;
+    uint256 internal constant MAX_PRIORITY_FEE_TAX_FLOOR = 100 gwei;
 
     AngstromL2[] public allHooks;
     mapping(PoolId id => AngstromL2 hook) public hookPoolIds;
@@ -98,6 +109,19 @@ contract AngstromL2Factory is Ownable, IFactory {
         emit DefaultProtocolTaxFeeE6Updated(newDefaultProtocolTaxFeeE6);
     }
 
+    function setDefaultJITTaxEnabled(bool newDefaultJITTaxEnabled) public {
+        _checkOwner();
+        defaultJITTaxEnabled = newDefaultJITTaxEnabled;
+        emit DefaultJITTaxStatusUpdated(newDefaultJITTaxEnabled);
+    }
+
+    function setDefaultPriorityFeeTaxFloor(uint256 newDefaultPriorityFeeTaxFloor) public {
+        _checkOwner();
+        if (newDefaultPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        defaultPriorityFeeTaxFloor = newDefaultPriorityFeeTaxFloor;
+        emit DefaultPriorityFeeTaxFloorUpdated(newDefaultPriorityFeeTaxFloor);
+    }
+
     function setProtocolSwapFee(AngstromL2 hook, PoolKey calldata key, uint256 newFeeE6) public {
         _checkOwner();
         if (!(newFeeE6 <= MAX_PROTOCOL_SWAP_FEE_E6)) {
@@ -114,6 +138,19 @@ contract AngstromL2Factory is Ownable, IFactory {
         }
         hook.setProtocolTaxFee(key, newFeeE6);
         emit ProtocolTaxFeeUpdated(address(hook), key, newFeeE6);
+    }
+
+    function setJITTaxEnabled(AngstromL2 hook, bool newJITTaxEnabled) public {
+        _checkOwner();
+        hook.setJITTaxEnabled(newJITTaxEnabled);
+        emit JITTaxStatusUpdated(address(hook), newJITTaxEnabled);
+    }
+
+    function setPriorityFeeTaxFloor(AngstromL2 hook, uint256 newPriorityFeeTaxFloor) public {
+        _checkOwner();
+        if (newPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        hook.setPriorityFeeTaxFloor(newPriorityFeeTaxFloor);
+        emit PriorityFeeTaxFloorUpdated(address(hook), newPriorityFeeTaxFloor);
     }
 
     /// @dev Only one hook per block per owner can be created using this method.
@@ -165,7 +202,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         PoolKey calldata key,
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6
-    ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6) {
+    ) public returns (uint24 protocolSwapFeeE6, uint24 protocolTaxFeeE6, bool jitTaxEnabled, uint256 priorityFeeTaxFloor) {
         if (withdrawOnly) revert WithdrawOnlyMode();
         if (!isVerifiedHook[AngstromL2(payable(msg.sender))]) {
             revert NotVerifiedHook();
@@ -180,7 +217,7 @@ contract AngstromL2Factory is Ownable, IFactory {
         emit PoolCreated(
             msg.sender, key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
         );
-        return (protocolSwapFeeE6, protocolTaxFeeE6);
+        return (protocolSwapFeeE6, protocolTaxFeeE6, defaultJITTaxEnabled, defaultPriorityFeeTaxFloor);
     }
 
     function getDefaultProtocolSwapFee(uint256 creatorSwapFeeE6, uint256 lpFeeE6)

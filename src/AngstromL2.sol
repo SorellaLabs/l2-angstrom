@@ -92,10 +92,6 @@ contract AngstromL2 is
     event WithdrawOnlyModeActivated();
     // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
-    // @notice Emitted when `jitTaxEnabled` is modified to `newValue`
-    event JITTaxStatusModified(bool newStatus);
-    // @notice Emitted when `priorityFeeTaxFloor` is modified
-    event PriorityFeeTaxFloorModified(uint256 previousValue, uint256 newValue);
 
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
@@ -159,16 +155,14 @@ contract AngstromL2 is
         currency.transfer(to, amount);
     }
 
-    function setJITTaxStatus(bool newStatus) public {
-        _checkOwner();
-        emit JITTaxStatusModified(newStatus);
+    function setJITTaxEnabled(bool newStatus) public {
+        _checkCallerIsFactory();
         jitTaxEnabled = newStatus;
     }
 
     function setPriorityFeeTaxFloor(uint256 _priorityFeeTaxFloor) public {
-        _checkOwner();
+        _checkCallerIsFactory();
         if (_priorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
-        emit PriorityFeeTaxFloorModified(priorityFeeTaxFloor, _priorityFeeTaxFloor);
         priorityFeeTaxFloor = _priorityFeeTaxFloor;
     }
 
@@ -247,7 +241,7 @@ contract AngstromL2 is
         UNI_V4.initialize(key, sqrtPriceX96);
         feeConfiguration.creatorSwapFeeE6 = creatorSwapFeeE6.toUint24();
         feeConfiguration.creatorTaxFeeE6 = creatorTaxFeeE6.toUint24();
-        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6) =
+        (feeConfiguration.protocolSwapFeeE6, feeConfiguration.protocolTaxFeeE6, jitTaxEnabled, priorityFeeTaxFloor) =
             IFactory(FACTORY)
                 .recordPoolCreationAndGetStartingProtocolFee(key, creatorSwapFeeE6, creatorTaxFeeE6);
         _checkFeeConfiguration(feeConfiguration);
