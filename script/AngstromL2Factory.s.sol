@@ -18,7 +18,7 @@ contract AngstromL2FactoryScript is BaseScript, Config {
     // Feb 2027
     uint256 constant GIVE_UP_CLAIM_DEADLINE = 1801752092;
     bytes constant GIVE_UP_CLAIM_SIG =
-        hex"fde82cc31e1ddd10a7139a490d5a7b30a826ba24eb780609eac611b71084a3fe0ac58482dc844490e19e0411577d33cb468133b0a335a3fffb0705f77d577f8e1b";
+        hex"edd4443d4654e60a5781aff3b88eb87abec4806a8ffb4fc3a69c1492eed48fdf661c669165020950ebd9efea6259f468685815dfe60f13b4b2477bcc988f94661c";
 
     function run() public {
         _loadConfigAndForks("script/config.toml", false);
