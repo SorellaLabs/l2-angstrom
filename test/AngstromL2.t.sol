@@ -104,6 +104,13 @@ contract AngstromL2Test is BaseTest {
 
         factory = new AngstromL2Factory(factoryOwner, manager, miner);
 
+        bool defaultJITTaxEnabled = factory.defaultJITTaxEnabled();
+        uint256 defaultPriorityFeeTaxFloor = factory.defaultPriorityFeeTaxFloor();
+
+        // first arg is false since we do not yet know the hook address
+        vm.expectEmit(false, true, true, true, address(factory));
+        emit AngstromL2Factory.JITTaxStatusUpdated(address(0), defaultJITTaxEnabled);
+        emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(address(0), defaultPriorityFeeTaxFloor);
         vm.prank(address(factory));
         bytes32 salt = miner.mineAngstromHookAddress(hookOwner);
 
