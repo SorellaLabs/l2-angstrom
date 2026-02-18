@@ -9,5 +9,19 @@ stateview = "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
 [base.bytes32]
 univ4-largest-eth-usdc-pool = "0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a"
 
+[base.uint256]
+priority-fee-floor = 10_000_000 # 0.01 gwei
+
+[unichain]
+endpoint_url = "https://unichain.drpc.org"
+
 [unichain.address]
 uniswap-v4-pool-manager = "0x1f98400000000000000000000000000000000004"
+usdc = "0x078D782b760474a361dDA0AF3839290b0EF57AD6"
+stateview = "0x86e8631a016f9068c3f085faf484ee3f5fdee8f2"
+
+[unichain.bytes32]
+univ4-largest-eth-usdc-pool = ""
+
+[unichain.uint256]
+priority-fee-floor = 1_000_000 # 0.001 gwei

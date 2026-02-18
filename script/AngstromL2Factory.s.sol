@@ -81,8 +81,10 @@ contract AngstromL2FactoryScript is BaseScript, Config {
             require(factory.HOOK_ADDRESS_MINER() == miner, "miner mismatch");
             require(factory.owner() == msg.sender, "owner mismatch");
 
+            uint256 priorityFeeFloor = config.get("priority-fee-floor").toUint256();
             factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
             factory.setDefaultProtocolTaxFee(0.1e6);
+            factory.setDefaultPriorityFeeTaxFloor(priorityFeeFloor);
 
             (uint160 sqrtPriceX96,,,) = StateView(stateView).getSlot0(PoolId.wrap(referencePricePool));
             PoolKey memory key = PoolKey( Currency.wrap(address(0)), Currency.wrap(usdc), 160, 10, IHooks(address(0)));
