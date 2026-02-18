@@ -186,7 +186,7 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * priorityFee;
+        return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
     }
 
     function getJitTaxAmount(uint256 priorityFee) public view returns (uint256) {
@@ -196,7 +196,7 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * priorityFee;
+        return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
     }
 
     function getPendingPositionRewards(
