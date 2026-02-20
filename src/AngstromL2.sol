@@ -99,6 +99,15 @@ contract AngstromL2 is
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
     uint256 internal constant TAXED_GAS = 100_000;
     uint256 internal constant MAX_SWAP_MEV_TAX_FACTOR = 9999;
+    uint256 internal constant SWAP_TAXED_GAS = 120_000;
+    /// @dev MEV tax charged is `priority_fee * SWAP_MEV_TAX_FACTOR` meaning the tax rate is
+    /// `SWAP_MEV_TAX_FACTOR / (SWAP_MEV_TAX_FACTOR + 1)`
+    uint256 constant SWAP_MEV_TAX_FACTOR = 99;
+    /// @dev Parameters for taxing just-in-time (JIT) liquidity
+    uint256 internal constant JIT_TAXED_GAS = 100_000;
+    /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
+    uint256 internal constant JIT_MEV_TAX_FACTOR = SWAP_MEV_TAX_FACTOR * 3 / 2;
+
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
     uint256 internal constant FACTOR_E6 = 1e6;

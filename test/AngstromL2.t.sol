@@ -180,7 +180,7 @@ contract AngstromL2Test is BaseTest {
         uint24 creatorSwapFeeE6,
         uint24 creatorTaxFeeE6,
         uint24 defaultProtocolSwapFeeMultiple,
-        uint24 defaultProtocolTaxFee        
+        uint24 defaultProtocolTaxFee
     ) internal returns (PoolKey memory key) {
         require(asset1 != address(0), "Token cannot be address(0)");
 
@@ -535,7 +535,7 @@ contract AngstromL2Test is BaseTest {
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.LPTaxDistributed(id, 6916140000000000);
+        emit AngstromL2.LPTaxDistributed(id, 8299368000000000);
 
         vm.expectEmit(false, false, false, false);
         emit Transfer(address(0), address(0), address(0), 0, 0);
@@ -745,15 +745,15 @@ contract AngstromL2Test is BaseTest {
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.LPTaxDistributed(id, 6916140000000000);
+        emit AngstromL2.LPTaxDistributed(id, 8299368000000000);
 
         vm.expectEmit(false, false, false, false);
         emit Transfer(address(0), address(0), address(0), 0, 0);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorTaxDistributed(id, 6930000000000);
+        emit AngstromL2.CreatorTaxDistributed(id, 8316000000000);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolSwapTaxDistributed(id, 6930000000000);
+        emit AngstromL2.ProtocolSwapTaxDistributed(id, 8316000000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
         emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(token)), 6910898912407324);
@@ -766,13 +766,13 @@ contract AngstromL2Test is BaseTest {
         emit MockERC20.Transfer(address(0), address(0), 0);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, 10, 160673270673542675891210917058155);
+        emit AngstromL2.GrowthOutsideX128Increased(id, 10, 185257555579017820281781645454990);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, 20, 245745518888356122691821447607212);
+        emit AngstromL2.GrowthOutsideX128Increased(id, 20, 305465139586954094332925774149369);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, 30, 245745518888356122691821447607212);
+        emit AngstromL2.GrowthOutsideX128Increased(id, 30, 305465139586954094332925774149369);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GlobalGrowthX128Increased(id, 245745518888356122691821447607212);
+        emit AngstromL2.GlobalGrowthX128Increased(id, 305465139586954094332925774149369);
 
         vm.expectEmit(false, false, false, false);
         emit MockERC20.Transfer(address(0), address(0), 0);
@@ -1372,9 +1372,9 @@ contract AngstromL2Test is BaseTest {
         setPriorityFee(0);
         router.swap(key, true, 100_000_000e18, int24(14).getSqrtPriceAtTick());
 
-        assertEq(getRewards(key, -20, 10), 4729002200429204, "wrong rewards for [-20, 10]");
-        assertEq(getRewards(key, 0, 20), 1447879383879822, "wrong rewards for [0, 20]");
-        assertEq(getRewards(key, 10, 20), 753118415690972, "wrong rewards for [10, 20]");
+        assertEq(getRewards(key, -20, 10), 5452917231125389, "wrong rewards for [-20, 10]");
+        assertEq(getRewards(key, 0, 20), 1799583175284891, "wrong rewards for [0, 20]");
+        assertEq(getRewards(key, 10, 20), 1063499593589719, "wrong rewards for [10, 20]");
         assertEq(getRewards(key, 30, 40), 0, "wrong rewards for [30, 40]");
 
         addLiquidity(key, -20, 40, 3e21);
