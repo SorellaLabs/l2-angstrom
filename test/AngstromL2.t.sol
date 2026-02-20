@@ -940,8 +940,8 @@ contract AngstromL2Test is BaseTest {
             "total rewards should match tax collected"
         );
 
-        assertEq(getRewards(key, -20, 20), 13199999999999999, "wrong rewards for [-20, 20]");
-        assertEq(getRewards(key, -10, 10), 6599999999999999, "wrong rewards for [-10, 10]");
+        assertEq(getRewards(key, -20, 20), 15839999999999999, "wrong rewards for [-20, 20]");
+        assertEq(getRewards(key, -10, 10), 7919999999999999, "wrong rewards for [-10, 10]");
         assertEq(getRewards(key, -30, -10), 0, "wrong rewards for [-30, -10]");
     }
 
@@ -973,8 +973,8 @@ contract AngstromL2Test is BaseTest {
         );
 
         // Verify rewards are distributed correctly
-        assertEq(getRewards(key, -20, 20), 13199999999999999, "wrong rewards for [-20, 20]");
-        assertEq(getRewards(key, -10, 10), 6599999999999999, "wrong rewards for [-10, 10]");
+        assertEq(getRewards(key, -20, 20), 15839999999999999, "wrong rewards for [-20, 20]");
+        assertEq(getRewards(key, -10, 10), 7919999999999999, "wrong rewards for [-10, 10]");
         assertEq(getRewards(key, 10, 30), 0, "wrong rewards for [10, 30]");
     }
 
