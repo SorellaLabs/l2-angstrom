@@ -104,17 +104,38 @@ contract AngstromL2Test is BaseTest {
 
         factory = new AngstromL2Factory(factoryOwner, manager, miner);
 
-        bool defaultJITTaxEnabled = factory.defaultJITTaxEnabled();
-        uint256 defaultPriorityFeeTaxFloor = factory.defaultPriorityFeeTaxFloor();
+        uint256 defaultSwapMEVTaxFactor = 99;
+        vm.prank(factoryOwner);
+        factory.setDefaultSwapMEVTaxFactor(defaultSwapMEVTaxFactor);
+        assertEq(factory.defaultSwapMEVTaxFactor(), defaultSwapMEVTaxFactor,
+            "defaultSwapMEVTaxFactor setup failed");
+        bool defaultJITTaxEnabled = false;
+        vm.prank(factoryOwner);
+        factory.setDefaultJITTaxEnabled(defaultJITTaxEnabled);
+        assertEq(factory.defaultJITTaxEnabled(), defaultJITTaxEnabled,
+            "defaultJITTaxEnabled setup failed");
+        uint256 defaultPriorityFeeTaxFloor = 0;
+        vm.prank(factoryOwner);
+        factory.setDefaultPriorityFeeTaxFloor(defaultPriorityFeeTaxFloor);
+        assertEq(factory.defaultPriorityFeeTaxFloor(), defaultPriorityFeeTaxFloor,
+            "defaultPriorityFeeTaxFloor setup failed");
 
         // first arg is false since we do not yet know the hook address
         vm.expectEmit(false, true, true, true, address(factory));
+        emit AngstromL2Factory.SwapMEVTaxFactorUpdated(address(0), defaultSwapMEVTaxFactor);
         emit AngstromL2Factory.JITTaxStatusUpdated(address(0), defaultJITTaxEnabled);
         emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(address(0), defaultPriorityFeeTaxFloor);
         vm.prank(address(factory));
         bytes32 salt = miner.mineAngstromHookAddress(hookOwner);
 
         angstrom = factory.deployNewHook(hookOwner, salt);
+
+        assertEq(angstrom.swapMEVTaxFactor(), defaultSwapMEVTaxFactor,
+            "swapMEVTaxFactor setup failed");
+        assertEq(angstrom.jitTaxEnabled(), defaultJITTaxEnabled,
+            "jitTaxEnabled setup failed");
+        assertEq(angstrom.priorityFeeTaxFloor(), defaultPriorityFeeTaxFloor,
+            "priorityFeeTaxFloor setup failed");
     }
 
     function ffiPythonGetCompensation(
@@ -919,8 +940,8 @@ contract AngstromL2Test is BaseTest {
             "total rewards should match tax collected"
         );
 
-        assertEq(getRewards(key, -20, 20), 13199999999999999, "wrong rewards for [-20, 20]");
-        assertEq(getRewards(key, -10, 10), 6599999999999999, "wrong rewards for [-10, 10]");
+        assertEq(getRewards(key, -20, 20), 15839999999999999, "wrong rewards for [-20, 20]");
+        assertEq(getRewards(key, -10, 10), 7919999999999999, "wrong rewards for [-10, 10]");
         assertEq(getRewards(key, -30, -10), 0, "wrong rewards for [-30, -10]");
     }
 
@@ -952,8 +973,8 @@ contract AngstromL2Test is BaseTest {
         );
 
         // Verify rewards are distributed correctly
-        assertEq(getRewards(key, -20, 20), 13199999999999999, "wrong rewards for [-20, 20]");
-        assertEq(getRewards(key, -10, 10), 6599999999999999, "wrong rewards for [-10, 10]");
+        assertEq(getRewards(key, -20, 20), 15839999999999999, "wrong rewards for [-20, 20]");
+        assertEq(getRewards(key, -10, 10), 7919999999999999, "wrong rewards for [-10, 10]");
         assertEq(getRewards(key, 10, 30), 0, "wrong rewards for [10, 30]");
     }
 

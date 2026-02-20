@@ -69,6 +69,7 @@ contract AngstromL2 is
     error PoolNotInitialized();
     error PoolAlreadyInitialized();
     error TotalFeeAboveOneHundredPercent();
+    error SwapMEVTaxFactorExceedsMax();
     error PriorityFeeTaxFloorExceedsMax();
 
     // @notice Emitted when `rewards[poolId].globalGrowthX128` increases by `growthX128`
@@ -93,10 +94,11 @@ contract AngstromL2 is
     // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
 
-    /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
-    /// a constant so that competing searchers have a bid cost independent of how much gas swap
+    /// @dev The `TAXED_GAS` is the abstract estimated gas cost for a swap or liquidity modification.
+    /// We want it to be a constant so that competing searchers have a bid cost independent of how much gas swap
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
-    uint256 internal constant SWAP_TAXED_GAS = 120_000;
+    uint256 internal constant TAXED_GAS = 120_000;
+    uint256 internal constant MAX_SWAP_MEV_TAX_FACTOR = 9999;
     /// @dev MEV tax charged is `priority_fee * SWAP_MEV_TAX_FACTOR` meaning the tax rate is
     /// `SWAP_MEV_TAX_FACTOR / (SWAP_MEV_TAX_FACTOR + 1)`
     uint256 constant SWAP_MEV_TAX_FACTOR = 99;
@@ -126,6 +128,9 @@ contract AngstromL2 is
 
     PoolKey[] public poolKeys;
 
+    /// @dev MEV tax charged is `priority_fee * swapMEVTaxFactor` meaning the tax rate is
+    /// `swapMEVTaxFactor / (swapMEVTaxFactor + 1)`
+    uint256 public swapMEVTaxFactor;
     /// @dev Swaps and liquidity modifications with priority fees at or below this value pay no tax
     uint256 public priorityFeeTaxFloor;
     /// @notice Whether or not the JIT tax is currently charged by this contract
@@ -153,6 +158,12 @@ contract AngstromL2 is
         _checkOwner();
         emit CreatorRevenueWithdrawn(currency, to, amount);
         currency.transfer(to, amount);
+    }
+
+    function setSwapMEVTaxFactor(uint256 newSwapMEVTaxFactor) public {
+        _checkCallerIsFactory();
+        if (newSwapMEVTaxFactor > MAX_SWAP_MEV_TAX_FACTOR) revert SwapMEVTaxFactorExceedsMax();
+        swapMEVTaxFactor = newSwapMEVTaxFactor;
     }
 
     function setJITTaxEnabled(bool newStatus) public {
@@ -186,7 +197,7 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return SWAP_MEV_TAX_FACTOR * SWAP_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
+        return swapMEVTaxFactor * TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
     }
 
     function getJitTaxAmount(uint256 priorityFee) public view returns (uint256) {
@@ -196,7 +207,12 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return JIT_MEV_TAX_FACTOR * JIT_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
+        return jitMEVTaxFactor() * TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
+    }
+
+    /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
+    function jitMEVTaxFactor() public view returns (uint256) {
+        return swapMEVTaxFactor * 3 / 2;
     }
 
     function getPendingPositionRewards(
