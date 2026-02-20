@@ -96,7 +96,7 @@ contract AngstromL2 is
     /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap. We want it to be
     /// a constant so that competing searchers have a bid cost independent of how much gas swap
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
-    uint256 internal constant SWAP_TAXED_GAS = 100_000;
+    uint256 internal constant SWAP_TAXED_GAS = 120_000;
     /// @dev MEV tax charged is `priority_fee * SWAP_MEV_TAX_FACTOR` meaning the tax rate is
     /// `SWAP_MEV_TAX_FACTOR / (SWAP_MEV_TAX_FACTOR + 1)`
     uint256 constant SWAP_MEV_TAX_FACTOR = 99;
