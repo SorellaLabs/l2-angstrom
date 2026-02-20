@@ -94,10 +94,10 @@ contract AngstromL2 is
     // @notice Emitted when `amount` of `currency` is withdrawn to `to` from accrued creator revenue
     event CreatorRevenueWithdrawn(Currency indexed currency, address indexed to, uint256 amount);
 
-    /// @dev The `SWAP_TAXED_GAS` is the abstract estimated gas cost for a swap or liquidity modification.
+    /// @dev The `TAXED_GAS` is the abstract estimated gas cost for a swap or liquidity modification.
     /// We want it to be a constant so that competing searchers have a bid cost independent of how much gas swap
     /// actually uses, the overall tax just needs to scale proportional to `priority_fee * swap_fixed_cost`.
-    uint256 internal constant SWAP_TAXED_GAS = 100_000;
+    uint256 internal constant TAXED_GAS = 100_000;
     uint256 internal constant MAX_SWAP_MEV_TAX_FACTOR = 9999;
     uint256 internal constant NATIVE_CURRENCY_ID = 0;
     Currency internal constant NATIVE_CURRENCY = CurrencyLibrary.ADDRESS_ZERO;
@@ -189,7 +189,7 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return swapMEVTaxFactor * SWAP_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
+        return swapMEVTaxFactor * TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
     }
 
     function getJitTaxAmount(uint256 priorityFee) public view returns (uint256) {
@@ -199,7 +199,7 @@ contract AngstromL2 is
         if (priorityFee <= priorityFeeTaxFloor) {
             return 0;
         }
-        return jitMEVTaxFactor() * SWAP_TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
+        return jitMEVTaxFactor() * TAXED_GAS * (priorityFee - priorityFeeTaxFloor);
     }
 
     /// @dev Slightly higher LP JIT liquidity tax to encourage it to be lower in the block.
