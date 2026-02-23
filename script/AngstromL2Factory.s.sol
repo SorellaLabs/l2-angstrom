@@ -46,6 +46,7 @@ contract AngstromL2FactoryScript is BaseScript, Config {
             factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
             factory.setDefaultProtocolTaxFee(0.1e6);
             factory.setDefaultPriorityFeeTaxFloor(priorityFeeFloor);
+            factory.setDefaultSwapMEVTaxFactor(99);
 
             (uint160 sqrtPriceX96,,,) = StateView(stateView).getSlot0(PoolId.wrap(referencePricePool));
             PoolKey memory key = PoolKey( Currency.wrap(address(0)), Currency.wrap(usdc), 160, 10, IHooks(address(0)));
