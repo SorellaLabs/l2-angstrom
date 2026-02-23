@@ -5,6 +5,9 @@
       "rev": "8bbcf6e3f8f62f419e5429a0bd89331c85c37824"
     }
   },
+  "lib/manyzeros-foundry": {
+    "rev": "ef97c49552fd1cea89ed497b54772a683f740ab5"
+  },
   "lib/solady": {
     "tag": {
       "name": "v0.1.26",

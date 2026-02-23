@@ -541,25 +541,25 @@ contract AngstromL2Test is BaseTest {
         emit Transfer(address(0), address(0), address(0), 0, 0);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorTaxDistributed(id, 6930000000000);
+        emit AngstromL2.CreatorTaxDistributed(id, 8316000000000);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolSwapTaxDistributed(id, 6930000000000);
+        emit AngstromL2.ProtocolSwapTaxDistributed(id, 8316000000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 99999999993070000000000);
+        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 99999999991684000000000);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 11099999999230770000000);
+        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 11099999999076924000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, 0, 72963986173213597868984092626597);
+        emit AngstromL2.GrowthOutsideX128Increased(id, 0, 81369337594247263004334806224694);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, -10, 205525826841007722997869247905194);
+        emit AngstromL2.GrowthOutsideX128Increased(id, -10, 241939912734897114063016296275948);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, -20, 212137534723190427833620037284303);
+        emit AngstromL2.GrowthOutsideX128Increased(id, -20, 258657574606421852127984417114517);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GrowthOutsideX128Increased(id, -30, 212137534723190427833620037284303);
+        emit AngstromL2.GrowthOutsideX128Increased(id, -30, 258657574606421852127984417114517);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.GlobalGrowthX128Increased(id, 212137534723190853186578688457382);
+        emit AngstromL2.GlobalGrowthX128Increased(id, 258657574606422702833901719460675);
 
         vm.expectEmit(false, false, false, false);
         emit MockERC20.Transfer(address(0), address(0), 0);
