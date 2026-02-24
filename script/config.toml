@@ -6,6 +6,7 @@ uniswap-v4-pool-manager = "0x498581ff718922c3f8e6a244956af099b2652b2b"
 position-manager = "0x7c5f5a4bbd8fd63184577525326123b519429bdc"
 usdc = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 stateview = "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
+universal-router = "0x6fF5693b99212Da76ad316178A184AB56D299b43"
 
 [base.bytes32]
 univ4-largest-eth-usdc-pool = "0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a"

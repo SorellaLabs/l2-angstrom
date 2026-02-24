@@ -4,6 +4,9 @@
   "scripts": {
     "add-liquidity": "forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
     "add-liquidity:lower": "MODE=lower forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
-    "add-liquidity:upper": "MODE=upper forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org"
+    "add-liquidity:upper": "MODE=upper forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
+    "swap": "forge script script/Swap.s.sol --fork-url https://mainnet.base.org",
+    "swap:eth-to-usdc": "DIRECTION=0for1 forge script script/Swap.s.sol --fork-url https://mainnet.base.org",
+    "swap:usdc-to-eth": "DIRECTION=1for0 forge script script/Swap.s.sol --fork-url https://mainnet.base.org"
   }
 }
