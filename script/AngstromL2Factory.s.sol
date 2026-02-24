@@ -4,11 +4,22 @@ pragma solidity ^0.8.0;
 import {BaseScript} from "./BaseScript.sol";
 import {Config} from "forge-std/Config.sol";
 import {console} from "forge-std/console.sol";
+import {SUB_ZERO} from "manyzeros-foundry/ISubZero.sol";
 import {AngstromL2Factory, AngstromL2, IHookAddressMiner, PoolKey, PoolId, Currency, IHooks} from "src/AngstromL2Factory.sol";
 import {StateView} from "v4-periphery/src/lens/StateView.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2FactoryScript is BaseScript, Config {
+    uint256 constant DEPLOY_TOKEN_ID =
+        0x2508b97b8041960cca8aabc7662f07ec8e285f6d0af37978e9add4c8397a16bf;
+    uint8 constant DEPLOY_TOKEN_NONCE = 94;
+    address constant MULTISIG = 0x2A49fF6D0154506D0e1Eda03655F274126ceF7B6;
+
+    // Feb 2027
+    uint256 constant GIVE_UP_CLAIM_DEADLINE = 1801752092;
+    bytes constant GIVE_UP_CLAIM_SIG =
+        hex"edd4443d4654e60a5781aff3b88eb87abec4806a8ffb4fc3a69c1492eed48fdf661c669165020950ebd9efea6259f468685815dfe60f13b4b2477bcc988f94661c";
+
     function run() public {
         _loadConfigAndForks("script/config.toml", false);
 
@@ -24,23 +35,54 @@ contract AngstromL2FactoryScript is BaseScript, Config {
 
             vm.startBroadcast();
 
-            IHookAddressMiner miner = IHookAddressMiner(0x0E177118dC36B78D9cc7F018d82090208601e467);
+            IHookAddressMiner miner;
+            {
+                bytes memory minerInitcode = getMinerCode(uniV4, true);
 
-            bytes memory creationCode = bytes.concat(
-                type(AngstromL2Factory).creationCode, abi.encode(msg.sender, uniV4, miner)
-            );
-            AngstromL2Factory factory;
-            assembly {
-                factory := create(0, add(creationCode, 0x20), mload(creationCode))
+                assembly ("memory-safe") {
+                    miner := create(0, add(minerInitcode, 0x20), mload(minerInitcode))
+                }
+                require(address(miner) != address(0), "failed to deploy miner");
             }
-            require(address(factory) != address(0), "failed to deploy factory");
-            console.log("  factory deployed: %s", address(factory));
 
+            address factoryAddr = SUB_ZERO.computeAddress(bytes32(DEPLOY_TOKEN_ID), DEPLOY_TOKEN_NONCE);
+            if (factoryAddr.code.length > 0) {
+                console.log("  factory already deployed: %s", factoryAddr);
+            } else {
+                bool minted;
+                try SUB_ZERO.getTokenData(DEPLOY_TOKEN_ID) returns (bool _minted, uint8) {
+                    minted = _minted;
+                } catch {
+                    minted = false;
+                }
+                if (!minted) {
+                    console.log("  token not minted, claiming...");
+
+                    SUB_ZERO.claimGivenUpWithSig(
+                        msg.sender,
+                        DEPLOY_TOKEN_ID,
+                        DEPLOY_TOKEN_NONCE,
+                        msg.sender,
+                        GIVE_UP_CLAIM_DEADLINE,
+                        GIVE_UP_CLAIM_SIG
+                    );
+                }
+
+                factoryAddr = SUB_ZERO.deploy(
+                    DEPLOY_TOKEN_ID,
+                    bytes.concat(
+                        type(AngstromL2Factory).creationCode, abi.encode(msg.sender, uniV4, miner)
+                    )
+                );
+                console.log("  factory deployed: %s", factoryAddr);
+            }
+
+            AngstromL2Factory factory = AngstromL2Factory(payable(factoryAddr));
             require(
-                address(AngstromL2Factory(payable(factory)).UNI_V4()) == uniV4, "uniV4 mismatch"
+                address(factory.UNI_V4()) == uniV4, "uniV4 mismatch"
             );
-            require(factory.HOOK_ADDRESS_MINER() == miner, "miner mismatch");
             require(factory.owner() == msg.sender, "owner mismatch");
+            require(factory.HOOK_ADDRESS_MINER() == miner, "miner mismatch");
 
             uint256 priorityFeeFloor = config.get("priority-fee-floor").toUint256();
             factory.setDefaultProtocolSwapFeeMultiple(0.25e6);
