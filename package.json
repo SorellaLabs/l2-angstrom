@@ -1,0 +1,9 @@
+{
+  "name": "l2-angstrom",
+  "packageManager": "bun",
+  "scripts": {
+    "add-liquidity": "forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
+    "add-liquidity:lower": "MODE=lower forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
+    "add-liquidity:upper": "MODE=upper forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org"
+  }
+}
