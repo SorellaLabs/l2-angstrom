@@ -26,6 +26,7 @@ contract AddLiquidityScript is BaseScript, Config {
         address positionManager;
         address usdc;
         address stateview;
+        address hook;
     }
 
     struct LiquidityParams {
@@ -46,7 +47,8 @@ contract AddLiquidityScript is BaseScript, Config {
             PoolConfig memory cfg = PoolConfig({
                 positionManager: config.get("position-manager").toAddress(),
                 usdc: config.get("usdc").toAddress(),
-                stateview: config.get("stateview").toAddress()
+                stateview: config.get("stateview").toAddress(),
+                hook: config.get("hook").toAddress()
             });
 
             console.log("Chain [%s]", chainId);
@@ -58,7 +60,7 @@ contract AddLiquidityScript is BaseScript, Config {
                 currency1: Currency.wrap(cfg.usdc),
                 fee: 160,
                 tickSpacing: 10,
-                hooks: IHooks(0x3171D8f9657ab66d3060ab6D71E14A80667B65cf)
+                hooks: IHooks(cfg.hook)
             });
 
             PoolId poolId = poolKey.toId();
@@ -80,10 +82,9 @@ contract AddLiquidityScript is BaseScript, Config {
             bytes memory callData = _encodeModifyLiquidities(poolKey, params);
 
             // Simulate the transaction using the exact calldata
-            address sender = 0x2508b97B8041960ccA8AaBC7662F07EC8e285F6d;
             uint256 ethValue = params.amount0Desired;
-            vm.deal(sender, ethValue);
-            vm.startPrank(sender);
+            vm.deal(msg.sender, ethValue);
+            vm.startPrank(msg.sender);
             IPositionManager posm = IPositionManager(cfg.positionManager);
             uint256 tokenIdBefore = posm.nextTokenId();
             (bool success,) = cfg.positionManager.call{value: ethValue}(callData);
@@ -91,7 +92,7 @@ contract AddLiquidityScript is BaseScript, Config {
             uint256 newTokenId = posm.nextTokenId() - 1;
             require(newTokenId >= tokenIdBefore, "No token minted");
             require(
-                IERC721(cfg.positionManager).ownerOf(newTokenId) == sender,
+                IERC721(cfg.positionManager).ownerOf(newTokenId) == msg.sender,
                 "Token not owned by sender"
             );
             vm.stopPrank();
@@ -176,10 +177,9 @@ contract AddLiquidityScript is BaseScript, Config {
 
     function _encodeActionParams(PoolKey memory poolKey, LiquidityParams memory params)
         internal
-        pure
+        view
         returns (bytes[] memory paramsArr)
     {
-        address sender = 0x2508b97B8041960ccA8AaBC7662F07EC8e285F6d;
         Currency currency0 = poolKey.currency0;
         Currency currency1 = poolKey.currency1;
 
@@ -191,11 +191,11 @@ contract AddLiquidityScript is BaseScript, Config {
             params.liquidity,
             params.amount0Desired,
             params.amount1Desired,
-            sender,
+            msg.sender,
             bytes("")
         );
         paramsArr[1] = abi.encode(currency0, currency1);
-        paramsArr[2] = abi.encode(currency0, sender);
+        paramsArr[2] = abi.encode(currency0, msg.sender);
     }
 
     function _encodeModifyLiquidities(PoolKey memory poolKey, LiquidityParams memory params)

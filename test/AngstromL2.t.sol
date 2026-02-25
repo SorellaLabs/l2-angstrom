@@ -69,8 +69,12 @@ contract AngstromL2Test is BaseTest {
 
     uint256 internal constant MAX_PRIORITY_FEE_TAX_FLOOR = 100 gwei;
 
-    event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
-    event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    event CreatorFeeDistributed(
+        PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount
+    );
+    event ProtocolFeeDistributed(
+        PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount
+    );
     event CreatorTaxDistributed(PoolId indexed poolId, uint256 amount);
     event ProtocolSwapTaxDistributed(PoolId indexed poolId, uint256 amount);
     event ProtocolJITTaxDistributed(PoolId indexed poolId, uint256 amount);
@@ -79,7 +83,11 @@ contract AngstromL2Test is BaseTest {
 
     // Uniswap-related event, ERC6909 transfer
     event Transfer(
-        address caller, address indexed sender, address indexed receiver, uint256 indexed id, uint256 amount
+        address caller,
+        address indexed sender,
+        address indexed receiver,
+        uint256 indexed id,
+        uint256 amount
     );
 
     function setUp() public {
@@ -107,18 +115,27 @@ contract AngstromL2Test is BaseTest {
         uint256 defaultSwapMEVTaxFactor = 99;
         vm.prank(factoryOwner);
         factory.setDefaultSwapMEVTaxFactor(defaultSwapMEVTaxFactor);
-        assertEq(factory.defaultSwapMEVTaxFactor(), defaultSwapMEVTaxFactor,
-            "defaultSwapMEVTaxFactor setup failed");
+        assertEq(
+            factory.defaultSwapMEVTaxFactor(),
+            defaultSwapMEVTaxFactor,
+            "defaultSwapMEVTaxFactor setup failed"
+        );
         bool defaultJITTaxEnabled = false;
         vm.prank(factoryOwner);
         factory.setDefaultJITTaxEnabled(defaultJITTaxEnabled);
-        assertEq(factory.defaultJITTaxEnabled(), defaultJITTaxEnabled,
-            "defaultJITTaxEnabled setup failed");
+        assertEq(
+            factory.defaultJITTaxEnabled(),
+            defaultJITTaxEnabled,
+            "defaultJITTaxEnabled setup failed"
+        );
         uint256 defaultPriorityFeeTaxFloor = 0;
         vm.prank(factoryOwner);
         factory.setDefaultPriorityFeeTaxFloor(defaultPriorityFeeTaxFloor);
-        assertEq(factory.defaultPriorityFeeTaxFloor(), defaultPriorityFeeTaxFloor,
-            "defaultPriorityFeeTaxFloor setup failed");
+        assertEq(
+            factory.defaultPriorityFeeTaxFloor(),
+            defaultPriorityFeeTaxFloor,
+            "defaultPriorityFeeTaxFloor setup failed"
+        );
 
         // first arg is false since we do not yet know the hook address
         vm.expectEmit(false, true, true, true, address(factory));
@@ -130,12 +147,15 @@ contract AngstromL2Test is BaseTest {
 
         angstrom = factory.deployNewHook(hookOwner, salt);
 
-        assertEq(angstrom.swapMEVTaxFactor(), defaultSwapMEVTaxFactor,
-            "swapMEVTaxFactor setup failed");
-        assertEq(angstrom.jitTaxEnabled(), defaultJITTaxEnabled,
-            "jitTaxEnabled setup failed");
-        assertEq(angstrom.priorityFeeTaxFloor(), defaultPriorityFeeTaxFloor,
-            "priorityFeeTaxFloor setup failed");
+        assertEq(
+            angstrom.swapMEVTaxFactor(), defaultSwapMEVTaxFactor, "swapMEVTaxFactor setup failed"
+        );
+        assertEq(angstrom.jitTaxEnabled(), defaultJITTaxEnabled, "jitTaxEnabled setup failed");
+        assertEq(
+            angstrom.priorityFeeTaxFloor(),
+            defaultPriorityFeeTaxFloor,
+            "priorityFeeTaxFloor setup failed"
+        );
     }
 
     function ffiPythonGetCompensation(
@@ -201,11 +221,16 @@ contract AngstromL2Test is BaseTest {
         uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
         vm.expectEmit(true, true, true, true, address(factory));
         emit AngstromL2Factory.PoolCreated(
-            address(angstrom), key, creatorSwapFeeE6, creatorTaxFeeE6, protocolSwapFeeE6, protocolTaxFeeE6
+            address(angstrom),
+            key,
+            creatorSwapFeeE6,
+            creatorTaxFeeE6,
+            protocolSwapFeeE6,
+            protocolTaxFeeE6
         );
 
         vm.prank(hookOwner);
-            angstrom.initializeNewPool(
+        angstrom.initializeNewPool(
             key, TickMath.getSqrtPriceAtTick(startTick), creatorSwapFeeE6, creatorTaxFeeE6
         );
 
@@ -332,9 +357,13 @@ contract AngstromL2Test is BaseTest {
         vm.expectEmit(false, false, false, false);
         emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 2000000000000000000000000);
+        emit AngstromL2.CreatorFeeDistributed(
+            id, Currency.wrap(address(0)), 2000000000000000000000000
+        );
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 3000000000000000000000000);
+        emit AngstromL2.ProtocolFeeDistributed(
+            id, Currency.wrap(address(0)), 3000000000000000000000000
+        );
         BalanceDelta delta =
             router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick());
 
@@ -546,9 +575,13 @@ contract AngstromL2Test is BaseTest {
         emit AngstromL2.ProtocolSwapTaxDistributed(id, 8316000000000);
 
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.CreatorFeeDistributed(id, Currency.wrap(address(0)), 99999999991684000000000);
+        emit AngstromL2.CreatorFeeDistributed(
+            id, Currency.wrap(address(0)), 99999999991684000000000
+        );
         vm.expectEmit(true, true, true, true, address(angstrom));
-        emit AngstromL2.ProtocolFeeDistributed(id, Currency.wrap(address(0)), 11099999999076924000000);
+        emit AngstromL2.ProtocolFeeDistributed(
+            id, Currency.wrap(address(0)), 11099999999076924000000
+        );
 
         vm.expectEmit(true, true, true, true, address(angstrom));
         emit AngstromL2.GrowthOutsideX128Increased(id, 0, 81369337594247263004334806224694);
@@ -573,7 +606,8 @@ contract AngstromL2Test is BaseTest {
         Slot0 slot0AfterSwap = manager.getSlot0(key.toId());
 
         uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee)
+            * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
@@ -786,7 +820,8 @@ contract AngstromL2Test is BaseTest {
 
         uint256 totalRewards = getAllRewards(key);
         uint24 protocolTaxFeeE6 = factory.defaultProtocolTaxFeeE6();
-        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee) * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
+        uint256 totalCompensationAmount = angstrom.getSwapTaxAmount(priorityFee)
+            * (1e6 - (protocolTaxFeeE6 + uint256(creatorTaxFeeE6))) / 1e6;
         assertApproxEqAbs(totalCompensationAmount, totalRewards, 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) = ffiPythonGetCompensation(
@@ -1389,7 +1424,9 @@ contract AngstromL2Test is BaseTest {
 
         factory.setDefaultJITTaxEnabled(newStatus);
 
-        assertEq(factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly");
+        assertEq(
+            factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly"
+        );
 
         // also check switch to false
         newStatus = false;
@@ -1398,7 +1435,9 @@ contract AngstromL2Test is BaseTest {
 
         factory.setDefaultJITTaxEnabled(newStatus);
 
-        assertEq(factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly");
+        assertEq(
+            factory.defaultJITTaxEnabled(), newStatus, "defaultJITTaxEnabled not set correctly"
+        );
     }
 
     function test_setDefaultJITTaxEnabled_NotOwner() public {
@@ -1415,7 +1454,9 @@ contract AngstromL2Test is BaseTest {
         factory.setJITTaxEnabled(angstrom, newStatus);
 
         assertEq(angstrom.jitTaxEnabled(), newStatus, "jitTaxEnabled not set correctly");
-        assertGt(angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should not be zero when enabled");
+        assertGt(
+            angstrom.getJitTaxAmount(1e18), 0, "JIT tax amount should not be zero when enabled"
+        );
 
         // repeat check
         newStatus = true;
@@ -1456,7 +1497,11 @@ contract AngstromL2Test is BaseTest {
 
         factory.setDefaultPriorityFeeTaxFloor(newDefaultPriorityFeeTaxFloor);
 
-        assertEq(factory.defaultPriorityFeeTaxFloor(), newDefaultPriorityFeeTaxFloor, "defaultPriorityFeeTaxFloor not set correctly");
+        assertEq(
+            factory.defaultPriorityFeeTaxFloor(),
+            newDefaultPriorityFeeTaxFloor,
+            "defaultPriorityFeeTaxFloor not set correctly"
+        );
 
         // also check switch to max
         newDefaultPriorityFeeTaxFloor = MAX_PRIORITY_FEE_TAX_FLOOR;
@@ -1465,7 +1510,11 @@ contract AngstromL2Test is BaseTest {
 
         factory.setDefaultPriorityFeeTaxFloor(newDefaultPriorityFeeTaxFloor);
 
-        assertEq(factory.defaultPriorityFeeTaxFloor(), newDefaultPriorityFeeTaxFloor, "defaultPriorityFeeTaxFloor not set correctly");
+        assertEq(
+            factory.defaultPriorityFeeTaxFloor(),
+            newDefaultPriorityFeeTaxFloor,
+            "defaultPriorityFeeTaxFloor not set correctly"
+        );
     }
 
     function test_setDefaultPriorityFeeTaxFloor_revert_NotOwner() public {
@@ -1487,8 +1536,11 @@ contract AngstromL2Test is BaseTest {
 
         factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
 
-        assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
-            "priorityFeeTaxFloor not set correctly");
+        assertEq(
+            angstrom.priorityFeeTaxFloor(),
+            _priorityFeeTaxFloor,
+            "priorityFeeTaxFloor not set correctly"
+        );
 
         vm.stopPrank();
     }
@@ -1497,22 +1549,39 @@ contract AngstromL2Test is BaseTest {
         vm.startPrank(factory.owner());
         if (_priorityFeeTaxFloor <= MAX_PRIORITY_FEE_TAX_FLOOR) {
             vm.expectEmit(true, true, true, true, address(factory));
-            emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(address(angstrom), _priorityFeeTaxFloor);
+            emit AngstromL2Factory.PriorityFeeTaxFloorUpdated(
+                address(angstrom), _priorityFeeTaxFloor
+            );
 
             factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);
 
-            assertEq(angstrom.priorityFeeTaxFloor(), _priorityFeeTaxFloor,
-                "priorityFeeTaxFloor not set correctly");
+            assertEq(
+                angstrom.priorityFeeTaxFloor(),
+                _priorityFeeTaxFloor,
+                "priorityFeeTaxFloor not set correctly"
+            );
 
             factory.setJITTaxEnabled(angstrom, true);
-            assertEq(angstrom.getJitTaxAmount(_priorityFeeTaxFloor), 0,
-                "JIT tax amount should be zero when priority fee is at floor");
-            assertEq(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor), 0,
-                "swap tax amount should be zero when priority fee is at floor");
-            assertGt(angstrom.getJitTaxAmount(_priorityFeeTaxFloor + 1), 0,
-                "JIT tax amount should be positive when priority fee is above floor");
-            assertGt(angstrom.getSwapTaxAmount(_priorityFeeTaxFloor + 1), 0,
-                "swap tax amount should be positive when priority fee is above floor");
+            assertEq(
+                angstrom.getJitTaxAmount(_priorityFeeTaxFloor),
+                0,
+                "JIT tax amount should be zero when priority fee is at floor"
+            );
+            assertEq(
+                angstrom.getSwapTaxAmount(_priorityFeeTaxFloor),
+                0,
+                "swap tax amount should be zero when priority fee is at floor"
+            );
+            assertGt(
+                angstrom.getJitTaxAmount(_priorityFeeTaxFloor + 1),
+                0,
+                "JIT tax amount should be positive when priority fee is above floor"
+            );
+            assertGt(
+                angstrom.getSwapTaxAmount(_priorityFeeTaxFloor + 1),
+                0,
+                "swap tax amount should be positive when priority fee is above floor"
+            );
         } else {
             vm.expectRevert(AngstromL2.PriorityFeeTaxFloorExceedsMax.selector);
             factory.setPriorityFeeTaxFloor(angstrom, _priorityFeeTaxFloor);

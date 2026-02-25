@@ -17,7 +17,9 @@ import {Actions} from "v4-periphery/src/libraries/Actions.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 interface IUniversalRouter {
-    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline)
+        external
+        payable;
 }
 
 interface IPermit2 {
@@ -29,7 +31,6 @@ contract SwapScript is BaseScript, Config {
     using PoolIdLibrary for PoolKey;
 
     address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
-    address constant SENDER = 0x2508b97B8041960ccA8AaBC7662F07EC8e285F6d;
 
     function run() public {
         _loadConfigAndForks("script/config.toml", false);
@@ -40,21 +41,23 @@ contract SwapScript is BaseScript, Config {
 
             address universalRouter = config.get("universal-router").toAddress();
             address usdc = config.get("usdc").toAddress();
+            address hook = config.get("hook").toAddress();
 
             console.log("Chain [%s]", chainId);
             console.log("  universalRouter: %s", universalRouter);
             console.log("  usdc: %s", usdc);
+            console.log("  hook: %s", hook);
 
             PoolKey memory poolKey = PoolKey({
                 currency0: Currency.wrap(address(0)),
                 currency1: Currency.wrap(usdc),
                 fee: 160,
                 tickSpacing: 10,
-                hooks: IHooks(0x3171D8f9657ab66d3060ab6D71E14A80667B65cf)
+                hooks: IHooks(hook)
             });
 
-            bool zeroForOne = keccak256(bytes(vm.envOr("DIRECTION", string("0for1"))))
-                == keccak256("0for1");
+            bool zeroForOne =
+                keccak256(bytes(vm.envOr("DIRECTION", string("0for1")))) == keccak256("0for1");
 
             uint256 amountIn;
             if (zeroForOne) {
@@ -68,16 +71,17 @@ contract SwapScript is BaseScript, Config {
 
             bytes memory callData = _encodeSwap(poolKey, zeroForOne, amountIn);
 
-            vm.startPrank(SENDER);
-
+            vm.startPrank(msg.sender);
             if (zeroForOne) {
-                vm.deal(SENDER, amountIn);
+                vm.deal(msg.sender, amountIn);
             } else {
-                deal(usdc, SENDER, amountIn);
+                deal(usdc, msg.sender, amountIn);
+                // need this line else the balance of msg.sender will be type(uint256).max which will cause payments to it to overflow
+                vm.deal(msg.sender, 1 ether);
                 IERC20(usdc).approve(PERMIT2, type(uint256).max);
-                IPermit2(PERMIT2).approve(usdc, universalRouter, type(uint160).max, type(uint48).max);
+                IPermit2(PERMIT2)
+                    .approve(usdc, universalRouter, type(uint160).max, type(uint48).max);
             }
-
             uint256 ethValue = zeroForOne ? amountIn : 0;
             (bool success,) = universalRouter.call{value: ethValue}(callData);
             require(success, "Swap simulation failed");
@@ -101,10 +105,6 @@ contract SwapScript is BaseScript, Config {
         view
         returns (bytes memory)
     {
-        uint160 sqrtPriceLimitX96 = zeroForOne
-            ? TickMath.MIN_SQRT_PRICE + 1
-            : TickMath.MAX_SQRT_PRICE - 1;
-
         Currency inputCurrency = zeroForOne ? poolKey.currency0 : poolKey.currency1;
         Currency outputCurrency = zeroForOne ? poolKey.currency1 : poolKey.currency0;
 
@@ -135,4 +135,9 @@ contract SwapScript is BaseScript, Config {
             IUniversalRouter.execute.selector, commands, inputs, block.timestamp + 300
         );
     }
+
+    // to receive ETH payments
+    receive() payable external {}
+
+    fallback() payable external {}
 }

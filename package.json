@@ -2,11 +2,12 @@
   "name": "l2-angstrom",
   "packageManager": "bun",
   "scripts": {
-    "add-liquidity": "forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
+    "add-liquidity:in-range": "forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
     "add-liquidity:lower": "MODE=lower forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
     "add-liquidity:upper": "MODE=upper forge script script/AddLiquidity.s.sol --fork-url https://mainnet.base.org",
     "swap": "forge script script/Swap.s.sol --fork-url https://mainnet.base.org",
     "swap:eth-to-usdc": "DIRECTION=0for1 forge script script/Swap.s.sol --fork-url https://mainnet.base.org",
-    "swap:usdc-to-eth": "DIRECTION=1for0 forge script script/Swap.s.sol --fork-url https://mainnet.base.org"
+    "swap:usdc-to-eth": "DIRECTION=1for0 forge script script/Swap.s.sol --fork-url https://mainnet.base.org",
+    "deploy-factory": "forge script script/AngstromL2Factory.s.sol --skip-simulation --sender 0x2508b97B8041960ccA8AaBC7662F07EC8e285F6d --broadcast --ledger --mnemonic-derivation-paths \"m/44'/60'/0'/0/1\""
   }
 }

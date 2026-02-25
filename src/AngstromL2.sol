@@ -77,9 +77,13 @@ contract AngstromL2 is
     // @notice Emitted when `rewards[.poolId].rewardGrowthOutsideX128[tick]` increases by `growthX128`
     event GrowthOutsideX128Increased(PoolId indexed poolId, int24 tick, uint256 growthX128);
     // @notice Emitted when `amount` of `feeCurrency` is taken for the pool creator, as fee on `poolId`
-    event CreatorFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    event CreatorFeeDistributed(
+        PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount
+    );
     // @notice Emitted when `amount` of `feeCurrency` is taken for the protocol, as fee on `poolId`
-    event ProtocolFeeDistributed(PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount);
+    event ProtocolFeeDistributed(
+        PoolId indexed poolId, Currency indexed feeCurrency, uint256 amount
+    );
     // @notice Emitted when `amount` of native currency is taken for the pool LPs, as tax on `poolId`
     event LPTaxDistributed(PoolId indexed poolId, uint256 amount);
     // @notice Emitted when `amount` of native currency is taken for the pool creator, as tax on `poolId`
@@ -165,7 +169,9 @@ contract AngstromL2 is
 
     function setPriorityFeeTaxFloor(uint256 _priorityFeeTaxFloor) public {
         _checkCallerIsFactory();
-        if (_priorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        if (_priorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) {
+            revert PriorityFeeTaxFloorExceedsMax();
+        }
         priorityFeeTaxFloor = _priorityFeeTaxFloor;
     }
 
