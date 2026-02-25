@@ -76,7 +76,7 @@ contract SwapScript is BaseScript, Config {
                 vm.deal(msg.sender, amountIn);
             } else {
                 deal(usdc, msg.sender, amountIn);
-                // need this line else the balance of msg.sender will be type(uint256).max which will cause payments to it to overflow
+                // need this line else the balance of msg.sender will be type(uint256).max which will cause ETH payments to it to overflow
                 vm.deal(msg.sender, 1 ether);
                 IERC20(usdc).approve(PERMIT2, type(uint256).max);
                 IPermit2(PERMIT2)
@@ -135,9 +135,4 @@ contract SwapScript is BaseScript, Config {
             IUniversalRouter.execute.selector, commands, inputs, block.timestamp + 300
         );
     }
-
-    // to receive ETH payments
-    receive() payable external {}
-
-    fallback() payable external {}
 }

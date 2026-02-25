@@ -12,15 +12,22 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 import {IERC721} from "forge-std/interfaces/IERC721.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {Actions} from "v4-periphery/src/libraries/Actions.sol";
 import {StateView} from "v4-periphery/src/lens/StateView.sol";
 
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 
+interface IPermit2 {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
 /// @author Philogy <https://github.com/philogy>
 contract AddLiquidityScript is BaseScript, Config {
     using PoolIdLibrary for PoolKey;
+
+    address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     struct PoolConfig {
         address positionManager;
@@ -83,8 +90,16 @@ contract AddLiquidityScript is BaseScript, Config {
 
             // Simulate the transaction using the exact calldata
             uint256 ethValue = params.amount0Desired;
-            vm.deal(msg.sender, ethValue);
+            vm.deal(msg.sender, ethValue + 1 ether);
             vm.startPrank(msg.sender);
+
+            // Permit2 approvals for USDC
+            if (params.amount1Desired > 0) {
+                IERC20(cfg.usdc).approve(PERMIT2, type(uint256).max);
+                IPermit2(PERMIT2)
+                    .approve(cfg.usdc, cfg.positionManager, type(uint160).max, type(uint48).max);
+            }
+
             IPositionManager posm = IPositionManager(cfg.positionManager);
             uint256 tokenIdBefore = posm.nextTokenId();
             (bool success,) = cfg.positionManager.call{value: ethValue}(callData);
