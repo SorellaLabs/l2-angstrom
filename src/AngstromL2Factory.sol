@@ -117,7 +117,9 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function setDefaultSwapMEVTaxFactor(uint256 newDefaultSwapMEVTaxFactor) public {
         _checkOwner();
-        if (newDefaultSwapMEVTaxFactor > MAX_SWAP_MEV_TAX_FACTOR) revert SwapMEVTaxFactorExceedsMax();
+        if (newDefaultSwapMEVTaxFactor > MAX_SWAP_MEV_TAX_FACTOR) {
+            revert SwapMEVTaxFactorExceedsMax();
+        }
         defaultSwapMEVTaxFactor = newDefaultSwapMEVTaxFactor;
         emit DefaultSwapMEVTaxFactorUpdated(newDefaultSwapMEVTaxFactor);
     }
@@ -130,7 +132,9 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function setDefaultPriorityFeeTaxFloor(uint256 newDefaultPriorityFeeTaxFloor) public {
         _checkOwner();
-        if (newDefaultPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        if (newDefaultPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) {
+            revert PriorityFeeTaxFloorExceedsMax();
+        }
         defaultPriorityFeeTaxFloor = newDefaultPriorityFeeTaxFloor;
         emit DefaultPriorityFeeTaxFloorUpdated(newDefaultPriorityFeeTaxFloor);
     }
@@ -168,7 +172,9 @@ contract AngstromL2Factory is Ownable, IFactory {
 
     function setPriorityFeeTaxFloor(AngstromL2 hook, uint256 newPriorityFeeTaxFloor) public {
         _checkOwner();
-        if (newPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) revert PriorityFeeTaxFloorExceedsMax();
+        if (newPriorityFeeTaxFloor > MAX_PRIORITY_FEE_TAX_FLOOR) {
+            revert PriorityFeeTaxFloorExceedsMax();
+        }
         hook.setPriorityFeeTaxFloor(newPriorityFeeTaxFloor);
         emit PriorityFeeTaxFloorUpdated(address(hook), newPriorityFeeTaxFloor);
     }
