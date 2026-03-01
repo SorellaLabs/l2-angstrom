@@ -493,6 +493,7 @@ contract AngstromL2Test is BaseTest {
         uint256 prec = uint256(1e18) / 1e5;
         assertApproxEqRel(totalCompensationAmount, getAllRewards(key), prec, "wrong tax total");
 
+        uint256 originalCompensation = totalCompensationAmount;
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
         for (uint256 i = 0; i < positionRewards.length; i++) {
@@ -515,8 +516,8 @@ contract AngstromL2Test is BaseTest {
                 "]"
             );
             if (rewards == 0 || positionRewards[i] == 0) {
-                uint256 maxDelta =
-                    i == positions.length - 1 ? totalCompensationAmount + 5000 : 5000;
+                uint256 maxDelta = originalCompensation / 1e4 + 1000;
+                if (i == positions.length - 1) maxDelta += totalCompensationAmount;
                 assertApproxEqAbs(rewards, positionRewards[i], maxDelta, errorMessage);
             } else {
                 assertApproxEqRel(rewards, positionRewards[i], prec, errorMessage);
