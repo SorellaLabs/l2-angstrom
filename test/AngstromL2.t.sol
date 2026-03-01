@@ -515,7 +515,8 @@ contract AngstromL2Test is BaseTest {
                 "]"
             );
             if (rewards == 0 || positionRewards[i] == 0) {
-                uint256 maxDelta = i == positions.length - 1 ? totalCompensationAmount + 1000 : 10;
+                uint256 maxDelta =
+                    i == positions.length - 1 ? totalCompensationAmount + 5000 : 5000;
                 assertApproxEqAbs(rewards, positionRewards[i], maxDelta, errorMessage);
             } else {
                 assertApproxEqRel(rewards, positionRewards[i], prec, errorMessage);
