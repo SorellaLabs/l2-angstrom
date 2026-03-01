@@ -49,3 +49,11 @@ line_length = 100
 fail_on_revert = true
 depth = 200
 runs = 256
+
+[profile.ci.fuzz]
+runs = 10_000
+
+[profile.ci.invariant]
+fail_on_revert = true
+depth = 200
+runs = 10_000
