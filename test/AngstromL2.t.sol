@@ -451,7 +451,7 @@ contract AngstromL2Test is BaseTest {
         console.log("totalCompensationAmount: %s", totalCompensationAmount.fmtD(18));
         console.log("getAllRewards: %s", getAllRewards(key).fmtD(18));
         console.log("end tick: %s (real end: %s)", endTick.toStr(), slot0AfterSwap.tick().toStr());
-        assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 15, "wrong tax total");
+        assertApproxEqAbs(totalCompensationAmount, getAllRewards(key), 10, "wrong tax total");
 
         (, uint256[] memory positionRewards) =
             ffiPythonGetCompensation(slot0BeforeSwap, slot0AfterSwap, true, totalCompensationAmount);
