@@ -37,6 +37,9 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
 
+      - name: Use hardcoded miner bytecode (huff2 not available)
+        run: sed -i 's/HUFF2_INSTALLED = true/HUFF2_INSTALLED = false/' test/AngstromL2.t.sol test/FeeAsymmetry.t.sol test/ReentrancyPOC.t.sol
+
       - name: Run tests
         run: forge test
 
