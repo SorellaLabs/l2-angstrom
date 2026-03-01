@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=$(cat | jq -r \".tool_input.file_path // empty\"); if [[ \"$FILE\" == *.sol ]]; then forge fmt \"$FILE\" 2>&1 || true; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
