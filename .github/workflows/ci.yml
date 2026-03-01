@@ -41,7 +41,7 @@ jobs:
         run: sed -i 's/HUFF2_INSTALLED = true/HUFF2_INSTALLED = false/' test/AngstromL2.t.sol test/FeeAsymmetry.t.sol test/ReentrancyPOC.t.sol
 
       - name: Run tests
-        run: forge test
+        run: forge test --ffi
 
   fmt:
     name: Format check
