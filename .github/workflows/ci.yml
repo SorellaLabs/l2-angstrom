@@ -8,7 +8,7 @@ on:
 permissions: {}
 
 env:
-  FOUNDRY_PROFILE: default
+  FOUNDRY_PROFILE: ci
 
 jobs:
   build:
