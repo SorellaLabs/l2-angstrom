@@ -376,6 +376,65 @@ contract AngstromL2Test is BaseTest {
         assertApproxEqAbs(creatorFee * 1e6 / totalIn, 0.02e6, 1);
     }
 
+    function test_swapWithFee_maxSwapTaxSet() public {
+        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0, 0, 0);
+        vm.prank(factoryOwner);
+        factory.setProtocolSwapFee(angstrom, key, 0.03e6);
+        setupSimpleZeroForOnePositions(key);
+
+        uint256 priorityFee = 0;
+        uint256 swapTaxAmount = angstrom.getSwapTaxAmount(priorityFee);
+        setPriorityFee(priorityFee);
+
+        PoolId id = key.toId();
+        // need to expect event from uniswap first, even though we don't care about it
+        vm.expectEmit(false, false, false, false);
+        emit IPoolManager.Swap(id, address(0), 0, 0, 0, 0, 0, 0);
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.CreatorFeeDistributed(
+            id, Currency.wrap(address(0)), 2000000000000000000000000
+        );
+        vm.expectEmit(true, true, true, true, address(angstrom));
+        emit AngstromL2.ProtocolFeeDistributed(
+            id, Currency.wrap(address(0)), 3000000000000000000000000
+        );
+        bytes memory hookData = abi.encode(swapTaxAmount);
+        BalanceDelta delta =
+            router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick(), hookData);
+
+        uint256 factoryFee = address(factory).balance;
+        uint256 creatorFee = address(angstrom).balance;
+
+        assertGe(delta.amount1(), 0, "non-positive amountOut");
+        uint256 totalIn = 100_000_000e18;
+        assertApproxEqAbs(factoryFee * 1e6 / totalIn, 0.03e6, 1);
+        assertApproxEqAbs(creatorFee * 1e6 / totalIn, 0.02e6, 1);
+    }
+
+    function test_swapWithFee_revert_SwapTaxExceedsSpecifiedMax() public {
+        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0, 0, 0);
+        vm.prank(factoryOwner);
+        factory.setProtocolSwapFee(angstrom, key, 0.03e6);
+        setupSimpleZeroForOnePositions(key);
+
+        uint256 priorityFee = 1e9;
+        uint256 swapTaxAmount = angstrom.getSwapTaxAmount(priorityFee);
+        setPriorityFee(priorityFee);
+
+        PoolId id = key.toId();
+
+        bytes memory hookData = abi.encode(swapTaxAmount - 1);
+        // The PoolManager wraps the hook's revert in a WrappedError
+        // Test that we get the correct wrapped error
+        vm.expectRevert(
+            uniswapWrapperErrorBytes(
+                IHooks.beforeSwap.selector, bytes.concat(AngstromL2.SwapTaxExceedsSpecifiedMax.selector)
+            )
+        );
+        BalanceDelta delta =
+            router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick(), hookData);
+    }
+
     function test_withdrawOnly() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
         addLiquidity(key, -10, 20, 10e21);

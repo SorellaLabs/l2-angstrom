@@ -46,6 +46,19 @@ contract RouterActor is IUnlockCallback {
         );
     }
 
+    function swap(PoolKey calldata key, bool zeroForOne, int256 amountSpecified, bytes calldata hookData)
+        external
+        returns (BalanceDelta)
+    {
+        return swap(
+            key,
+            zeroForOne,
+            amountSpecified,
+            zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1,
+            hookData
+        );
+    }
+
     function swap(
         PoolKey calldata key,
         bool zeroForOne,
@@ -67,7 +80,7 @@ contract RouterActor is IUnlockCallback {
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96,
         bytes calldata hookData
-    ) external returns (BalanceDelta) {
+    ) public returns (BalanceDelta) {
         bytes memory ret = uniV4.unlock(
             bytes.concat(
                 bytes1(uint8(Action.SwapWithData)),

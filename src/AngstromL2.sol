@@ -71,6 +71,7 @@ contract AngstromL2 is
     error TotalFeeAboveOneHundredPercent();
     error SwapMEVTaxFactorExceedsMax();
     error PriorityFeeTaxFloorExceedsMax();
+    error SwapTaxExceedsSpecifiedMax();
 
     // @notice Emitted when `rewards[poolId].globalGrowthX128` increases by `growthX128`
     event GlobalGrowthX128Increased(PoolId indexed poolId, uint256 growthX128);
@@ -329,7 +330,7 @@ contract AngstromL2 is
         );
     }
 
-    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata optionalMaxSwapTax)
         external
         override
         nonReentrant
@@ -338,11 +339,16 @@ contract AngstromL2 is
         _onlyUniV4();
         if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
 
+        int128 swapTax = _getSwapTaxAmount().toInt128();
+        if (optionalMaxSwapTax.length != 0) {
+            uint256 maxSwapTax = abi.decode(optionalMaxSwapTax, (uint256));
+            if (uint256(int256(swapTax)) > maxSwapTax) revert SwapTaxExceedsSpecifiedMax();
+        }
+
         PoolId id = key.calldataToId();
         slot0BeforeSwapStore.set(Slot0.unwrap(UNI_V4.getSlot0(id)));
         liquidityBeforeSwap.set(UNI_V4.getPoolLiquidity(id));
 
-        int128 swapTax = _getSwapTaxAmount().toInt128();
         bool exactIn = params.amountSpecified < 0;
         bool etherIsInput = params.zeroForOne;
 
