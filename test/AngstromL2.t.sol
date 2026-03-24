@@ -428,7 +428,8 @@ contract AngstromL2Test is BaseTest {
         // Test that we get the correct wrapped error
         vm.expectRevert(
             uniswapWrapperErrorBytes(
-                IHooks.beforeSwap.selector, bytes.concat(AngstromL2.SwapTaxExceedsSpecifiedMax.selector)
+                IHooks.beforeSwap.selector,
+                bytes.concat(AngstromL2.SwapTaxExceedsSpecifiedMax.selector)
             )
         );
         BalanceDelta delta =

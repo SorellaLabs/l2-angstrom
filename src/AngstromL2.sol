@@ -330,12 +330,12 @@ contract AngstromL2 is
         );
     }
 
-    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata optionalMaxSwapTax)
-        external
-        override
-        nonReentrant
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
+    function beforeSwap(
+        address,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        bytes calldata optionalMaxSwapTax
+    ) external override nonReentrant returns (bytes4, BeforeSwapDelta, uint24) {
         _onlyUniV4();
         if (_cachedWithdrawOnly) revert IFactory.WithdrawOnlyMode();
 

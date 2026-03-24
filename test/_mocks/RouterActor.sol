@@ -46,10 +46,12 @@ contract RouterActor is IUnlockCallback {
         );
     }
 
-    function swap(PoolKey calldata key, bool zeroForOne, int256 amountSpecified, bytes calldata hookData)
-        external
-        returns (BalanceDelta)
-    {
+    function swap(
+        PoolKey calldata key,
+        bool zeroForOne,
+        int256 amountSpecified,
+        bytes calldata hookData
+    ) external returns (BalanceDelta) {
         return swap(
             key,
             zeroForOne,
