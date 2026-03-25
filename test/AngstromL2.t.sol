@@ -436,6 +436,18 @@ contract AngstromL2Test is BaseTest {
             router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick(), hookData);
     }
 
+    function test_swapWithFee_revert_optionalMaxSwapTaxMalformed() public {
+        // arrange
+        PoolKey memory key = initializePool(address(token), 10, 3, 0.02e6, 0, 0, 0);
+        setupSimpleZeroForOnePositions(key);
+        setPriorityFee(0);
+
+        // act & assert
+        bytes memory hookData = hex"deadbeef";
+        vm.expectRevert();
+        router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick(), hookData);
+    }
+
     function test_withdrawOnly() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
         addLiquidity(key, -10, 20, 10e21);
