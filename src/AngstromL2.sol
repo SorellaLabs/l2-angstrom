@@ -659,14 +659,18 @@ contract AngstromL2 is
         return x > y ? x : y;
     }
 
+    /// @dev `tx.gasprice` can be below `block.basefee` in `eth_estimateGas` calls without fee
+    /// fields and in OP-stack deposit transactions, both of which are treated as a zero priority fee.
+    function _getPriorityFee() internal view returns (uint256) {
+        return tx.gasprice > block.basefee ? tx.gasprice - block.basefee : 0;
+    }
+
     function _getSwapTaxAmount() internal view returns (uint256) {
-        uint256 priorityFee = tx.gasprice - block.basefee;
-        return getSwapTaxAmount(priorityFee);
+        return getSwapTaxAmount(_getPriorityFee());
     }
 
     function _getJitTaxAmount() internal view returns (uint256) {
-        uint256 priorityFee = tx.gasprice - block.basefee;
-        return getJitTaxAmount(priorityFee);
+        return getJitTaxAmount(_getPriorityFee());
     }
 
     function _checkCallerIsFactory() internal view {
