@@ -20,7 +20,9 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.3
 
       - name: Build
         run: forge build
@@ -35,7 +37,9 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.3
 
       - name: Use hardcoded miner bytecode (huff2 not available)
         run: sed -i 's/HUFF2_INSTALLED = true/HUFF2_INSTALLED = false/' test/AngstromL2.t.sol test/FeeAsymmetry.t.sol test/ReentrancyPOC.t.sol
@@ -52,7 +56,9 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.3
 
       - name: Check formatting
         run: forge fmt --check
@@ -66,7 +72,9 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10 # v1.7.0
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.3
 
       - name: Run linter
         run: forge lint

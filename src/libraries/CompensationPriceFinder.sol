@@ -219,7 +219,8 @@ library CompensationPriceFinder {
             // `0 = 2Ls - (Yhat + y)` <> `s = (Yhat + y) / 2L`.
 
             return (sumUpToThisRange1 + rangeVirtualReserves1)
-                .fullMulDiv(1 << (Q96MathLib.RESOLUTION - 1), liquidity).toUint160();
+                .fullMulDiv(1 << (Q96MathLib.RESOLUTION - 1), liquidity)
+                .toUint160();
         }
     }
 
