@@ -18,15 +18,11 @@ import {StateView} from "v4-periphery/src/lens/StateView.sol";
 
 /// @author philogy <https://github.com/philogy>
 contract AngstromL2FactoryScript is BaseScript, Config {
+    /// @dev Sub Zero salt owned by the deployer (first 20 bytes of the ID), so it can `mint` it directly.
     uint256 constant DEPLOY_TOKEN_ID =
-        0x2508b97b8041960cca8aabc7662f07ec8e285f6d0af37978e9add4c8397a16bf;
-    uint8 constant DEPLOY_TOKEN_NONCE = 94;
+        0xd3a9450753c7d15538c99c5ae061ceba7c91ac9bdf179f3780cec95c17042096;
+    uint8 constant DEPLOY_TOKEN_NONCE = 79;
     address constant MULTISIG = 0x2A49fF6D0154506D0e1Eda03655F274126ceF7B6;
-
-    // Feb 2027
-    uint256 constant GIVE_UP_CLAIM_DEADLINE = 1801752092;
-    bytes constant GIVE_UP_CLAIM_SIG =
-        hex"edd4443d4654e60a5781aff3b88eb87abec4806a8ffb4fc3a69c1492eed48fdf661c669165020950ebd9efea6259f468685815dfe60f13b4b2477bcc988f94661c";
 
     function run() public {
         _loadConfigAndForks("script/config.toml", false);
@@ -65,16 +61,8 @@ contract AngstromL2FactoryScript is BaseScript, Config {
                     minted = false;
                 }
                 if (!minted) {
-                    console.log("  token not minted, claiming...");
-
-                    SUB_ZERO.claimGivenUpWithSig(
-                        msg.sender,
-                        DEPLOY_TOKEN_ID,
-                        DEPLOY_TOKEN_NONCE,
-                        msg.sender,
-                        GIVE_UP_CLAIM_DEADLINE,
-                        GIVE_UP_CLAIM_SIG
-                    );
+                    console.log("  token not minted, minting...");
+                    SUB_ZERO.mint(msg.sender, DEPLOY_TOKEN_ID, DEPLOY_TOKEN_NONCE);
                 }
 
                 factoryAddr = SUB_ZERO.deploy(

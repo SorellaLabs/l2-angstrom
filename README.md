@@ -32,16 +32,20 @@ $ cargo run --release -- --owner <DEPLOYER_ADDRESS> --zeros 6
 
 This outputs a `DEPLOY_TOKEN_ID` and `DEPLOY_TOKEN_NONCE` used by the deploy script.
 
-### Signing EIP-712 permit for giving up token  
+Mine with `--owner` set to the deployer: the first 20 bytes of the token ID are its owner, and the
+deploy scripts call `SUB_ZERO.mint` directly, which only the owner can do.
 
-To sign the permit to give up vanity token so that we can call `SUB_ZERO.claimGivenUpWithSig`, use the following command:
+### Signing EIP-712 permit for giving up token (only if the deployer doesn't own the salt)
+
+If the salt was mined for a different owner, that owner has to sign a permit that lets the
+deployer call `SUB_ZERO.claimGivenUpWithSig` instead:
 
 ```shell
 $ cast wallet sign --data --from-file script/eip712.json
 ```
 
-Adjust the `script/eip712.json` file with the correct `DEPLOY_TOKEN_ID` and `nonce` accordingly. 
-With the output signature, update the signature in the deployment script.
+Adjust the `script/eip712.json` file with the correct `DEPLOY_TOKEN_ID`, `nonce` and `claimer`
+accordingly, and replace the script's `SUB_ZERO.mint` call with `claimGivenUpWithSig`.
 
 ### Network Configuration
 
@@ -51,7 +55,7 @@ Reference `script/config.toml` — currently configured for Base and Unichain wi
 
 The factory deployment script (`script/AngstromL2Factory.s.sol`) handles:
 - Deploying the Huff-based hook address miner
-- Claiming the vanity token from Sub Zero (if not already minted)
+- Minting the vanity token from Sub Zero (if not already minted)
 - Deploying `AngstromL2Factory` via `SUB_ZERO.deploy()`
 
 ```shell
