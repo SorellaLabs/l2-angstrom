@@ -95,7 +95,8 @@ contract BaseTest is Test, HookDeployer {
             if (abi.encodeWithSignature(
                         "CheatcodeError(string)",
                         "vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
-                    ).eq(errData)) {
+                    )
+                    .eq(errData)) {
                 return getHardcodedMinerCode(uniV4);
             }
             bool sigMatch =

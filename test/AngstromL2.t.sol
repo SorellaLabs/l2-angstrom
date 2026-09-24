@@ -514,6 +514,36 @@ contract AngstromL2Test is BaseTest {
         router.swap(key, true, -100_000_000e18, int24(-35).getSqrtPriceAtTick(), hookData);
     }
 
+    /// @dev `eth_estimateGas` without fee fields and OP-stack deposit transactions both run with
+    /// `tx.gasprice = 0` while `block.basefee` is non-zero.
+    function setGasPriceBelowBaseFee() internal {
+        vm.fee(5_000_000);
+        vm.txGasPrice(0);
+    }
+
+    function test_addLiquidity_gasPriceBelowBaseFee() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        setGasPriceBelowBaseFee();
+
+        addLiquidity(key, -10, 20, 10e21);
+    }
+
+    function test_swap_gasPriceBelowBaseFee() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        addLiquidity(key, -10, 20, 10e21);
+        setGasPriceBelowBaseFee();
+
+        router.swap(key, true, -100_000_00, int24(-14).getSqrtPriceAtTick());
+    }
+
+    function test_removeLiquidity_gasPriceBelowBaseFee() public {
+        PoolKey memory key = initializePool(address(token), 10, 3);
+        addLiquidity(key, -10, 20, 10e21);
+        setGasPriceBelowBaseFee();
+
+        router.modifyLiquidity(key, -10, 20, -10e21, bytes32(0));
+    }
+
     function test_withdrawOnly() public {
         PoolKey memory key = initializePool(address(token), 10, 3);
         addLiquidity(key, -10, 20, 10e21);
